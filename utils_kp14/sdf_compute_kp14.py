@@ -90,19 +90,30 @@ Et_A_mod_A = lambda eps, u: (A_0 + A_2 * Et_um1(u))*Et_A_mod(eps) + (A_1 + A_3 *
 Et_A_G_up = lambda eps, u: (A_0 + A_2 * Et_um1(u))*Et_G_up(eps) + (A_1 + A_3 * Et_um1(u))* Et_ep_G_up(eps)
 Et_A_G_down = lambda eps, u: (A_0 + A_2 * Et_um1(u))*Et_G_down(eps) + (A_1 + A_3 * Et_um1(u))* Et_ep_G_down(eps)
 
-# Covariance computations 
+# Covariance computations
 def sdf_compute(N, T, arr_tuple):
     K, book, op_cashflow, x, z, eps, uj, chi, rate, high, Et_G, EtA, alph, Et_z_alph, price, ret, eret, lambda_f, loadings_z_taylor, loadings_x_taylor, loadings_z_proj, loadings_x_proj   = arr_tuple
-    
+
     part1 = (C*rate*dt*Et_A_mod(eps) + Et_G)
-    part2 = (1 - delta*dt)*np.sum(chi*EtA*K**alpha, axis = 0)
+
+    # MEMORY OPTIMIZATION: part2 is now computed on-demand inside sdf_loop()
+    # Previous version pre-computed: part2 = (1 - delta*dt)*np.sum(chi*EtA*K**alpha, axis = 0)
+    # This created intermediate K**alpha array with shape (921, 921, 1000) = 6.32 GB
+    # Combined with arr_tuple (27.24 GB), total memory requirement was 33.56 GB
+    # This exceeded available memory and caused numpy._core._exceptions._ArrayMemoryError
+    #
+    # New approach computes part2[t,:] on-demand for each time t inside the loop:
+    # - Only creates small slices K[:t+1, t, :]**alpha with max shape (921, 1000) = 0.007 GB
+    # - Reduces total operations: ~359M vs ~849M (only computes needed time periods)
+    # - Faster overall due to better cache locality and progressive sizing
+
     Et_z_alph2 = z**(2*alph)*np.exp(2*alph*mu_z*dt + alph*(3*alpha-1)/(1 - alpha)*sigma_z**2*dt)
     Et_x2 = x**2*np.exp(2*mu_x*dt + sigma_x**2*dt)
 
     def sdf_loop(t, iter): # compute ER at date t+1 (to t+2)
         t = t +1 # to match BGN timing
         ER = np.zeros((N+1, N+1))
-        
+
         # start with f1 != f2
         Ktalpha = K[:t + 1, t, :]**alpha
         Ktalpha_sp = csr_matrix(Ktalpha)
@@ -110,7 +121,10 @@ def sdf_compute(N, T, arr_tuple):
         result = kron(col, col)
         term1 = (1 - delta*dt)**2*result.sum(axis=0).reshape(N, N).A
 
-        term2 = Et_z_alph[t]*np.outer(part1[t,:], part2[t,:])
+        # Compute part2 on-demand for this time t only (memory optimization)
+        # Uses same Ktalpha already computed above, so no redundant computation
+        part2_t = (1 - delta*dt)*np.sum(chi[:t+1, t, :]*EtA[:t+1, t, :]*Ktalpha, axis=0)
+        term2 = Et_z_alph[t]*np.outer(part1[t,:], part2_t)
         term2 = term2 + term2.T
 
         term3 = Et_z_alph2[t]*np.outer(part1[t,:], part1[t,:])

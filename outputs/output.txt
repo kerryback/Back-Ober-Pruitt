@@ -533,3 +533,124 @@ Return code: 0
 KP14 MODEL - Started at Tue 16 Dec 2025, 08:01AM
 ======================================================================
 
+======================================================================
+PANEL GENERATION
+======================================================================
+Model: KP14
+Identifier: 0
+Started at Tue 16 Dec 2025, 08:01AM
+======================================================================
+
+Parameters:
+  N (firms): 1000
+  T (periods): 720
+  Burnin: 200
+  Characteristics: ['size', 'bm', 'agr', 'roe', 'mom']
+
+----------------------------------------------------------------------
+Generating panel for KP14 model...
+----------------------------------------------------------------------
+Creating arrays...
+Creating panel...
+
+----------------------------------------------------------------------
+Saving panel and arrays to C:\Users\kerry\repos\CodeNew\NoIPCA\outputs\kp14_0_arrays.pkl...
+----------------------------------------------------------------------
+[OK] Saved successfully
+
+----------------------------------------------------------------------
+PANEL SUMMARY
+----------------------------------------------------------------------
+Model: KP14 (identifier=0)
+  Shape: (720000, 13)
+  Columns: ['month', 'firmid', 'mve', 'xret', 'A_1_taylor', 'A_2_taylor', 'A_1_proj', 'A_2_proj', 'roe', 'bm', 'mom', 'agr', 'size']
+  Months: 200 to 919
+  Unique months: 720
+  Firms: 1000
+  Characteristics: ['size', 'bm', 'agr', 'roe', 'mom']
+  Mean excess return: 0.0073
+  Std excess return: 0.0653
+
+======================================================================
+GENERATION COMPLETE
+======================================================================
+Finished at Tue 16 Dec 2025, 08:13AM
+Total runtime: 692.5s (11.5 minutes)
+
+Output file: C:\Users\kerry\repos\CodeNew\NoIPCA\outputs\kp14_0_arrays.pkl
+
+To compute SDF moments:
+  python calculate_moments.py kp14_0
+
+To extract factors:
+  python run_fama.py kp14_0
+  python run_dkkm.py kp14_0 1000
+======================================================================
+======================================================================
+SDF CONDITIONAL MOMENTS CALCULATION
+======================================================================
+Panel ID: kp14_0
+Model: kp14
+Started at Tue 16 Dec 2025, 08:13AM
+======================================================================
+
+Loading arrays from C:\Users\kerry\repos\CodeNew\NoIPCA\outputs\kp14_0_arrays.pkl...
+Loaded arrays: N=1000, T=720
+
+----------------------------------------------------------------------
+Computing SDF conditional moments...
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\kerry\repos\CodeNew\NoIPCA\calculate_moments.py", line 272, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\kerry\repos\CodeNew\NoIPCA\calculate_moments.py", line 138, in main
+    sdf_loop = sdf_module.sdf_compute(N, T + burnin, arr_tuple)
+  File "C:\Users\kerry\repos\CodeNew\NoIPCA\utils_kp14\sdf_compute_kp14.py", line 98, in sdf_compute
+    part2 = (1 - delta*dt)*np.sum(chi*EtA*K**alpha, axis = 0)
+                                          ~^^~~~~~
+numpy._core._exceptions._ArrayMemoryError: Unable to allocate 6.32 GiB for an array with shape (921, 921, 1000) and data type float64
+======================================================================
+NoIPCA - COMPLETE WORKFLOW
+======================================================================
+Started at Tue 16 Dec 2025, 08:01AM
+
+Configuration:
+  Model: kp14
+  Panel ID: 0
+  Full identifier: kp14_0
+  DKKM features: [6, 36, 360]
+
+
+======================================================================
+STEP 1: Generating KP14 panel data
+======================================================================
+Running: C:\Users\kerry\AppData\Local\Programs\Python\Python313\python.exe generate_panel.py kp14 0
+Started at 08:01AM
+[OK] Completed at 08:13AM (took 695.0s / 11.6min)
+
+======================================================================
+STEP 2: Calculating SDF conditional moments (rp, cond_var, etc.)
+======================================================================
+Running: C:\Users\kerry\AppData\Local\Programs\Python\Python313\python.exe calculate_moments.py kp14_0
+Started at 08:13AM
+
+[ERROR] calculate_moments.py failed with return code 1
+
+======================================================================
+KP14 MODEL - Completed at Tue 16 Dec 2025, 08:14AM
+Total time: 736.0s (12.3min)
+Return code: 1
+======================================================================
+
+
+======================================================================
+ALL MODELS COMPLETE
+======================================================================
+Finished at: Tue 16 Dec 2025, 08:14AM
+Total time: 1497.4s (25.0min)
+
+Results:
+  BGN: SUCCESS
+  KP14: FAILED
+======================================================================
