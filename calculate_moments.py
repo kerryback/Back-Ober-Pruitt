@@ -10,8 +10,8 @@ Usage:
 
 Arguments:
     panel_id: Panel identifier (e.g., "bgn_0", "kp14_0", "gs21_5")
-              Reads from arrays_{panel_id}.pkl
-              Output: moments_{panel_id}.pkl
+              Reads from {panel_id}_arrays.pkl
+              Output: {panel_id}_moments.pkl
 
 Examples:
     python calculate_moments.py kp14_0
@@ -97,7 +97,7 @@ def main():
     print("="*70)
 
     # Load arrays data
-    arrays_path = os.path.join(DATA_DIR, f"arrays_{panel_id}.pkl")
+    arrays_path = os.path.join(DATA_DIR, f"{panel_id}_arrays.pkl")
 
     if not os.path.exists(arrays_path):
         print(f"ERROR: Arrays file not found at: {arrays_path}")
@@ -177,7 +177,7 @@ def main():
         chunk_moments = {month: moments_dict for month, moments_dict in chunk_results}
 
         # Save chunk to temporary file
-        chunk_file = os.path.join(DATA_DIR, f"moments_{panel_id}_chunk{chunk_idx}.pkl")
+        chunk_file = os.path.join(DATA_DIR, f"{panel_id}_moments_chunk{chunk_idx}.pkl")
         with open(chunk_file, 'wb') as f:
             pickle.dump(chunk_moments, f)
         chunk_files.append(chunk_file)
@@ -213,7 +213,7 @@ def main():
     print(f"[OK] Consolidated {len(moments)} months")
 
     # Save moments to file
-    output_file = os.path.join(DATA_DIR, f"moments_{panel_id}.pkl")
+    output_file = os.path.join(DATA_DIR, f"{panel_id}_moments.pkl")
 
     print(f"\nSaving consolidated moments to {output_file}...")
     with open(output_file, 'wb') as f:

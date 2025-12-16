@@ -31,7 +31,7 @@ def load_precomputed_moments(panel_id: str) -> Tuple[Dict, int]:
         moments dict has structure: {month: {'rp', 'cond_var', 'second_moment', 'second_moment_inv', ...}}
     """
     # Load the moments pickle file
-    moments_file = os.path.join(DATA_DIR, f'moments_{panel_id}.pkl')
+    moments_file = os.path.join(DATA_DIR, f'{panel_id}_moments.pkl')
 
     if not os.path.exists(moments_file):
         raise FileNotFoundError(

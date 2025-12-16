@@ -3,7 +3,7 @@ NoIPCA Directory Structure (Current - After Refactoring)
 
 NoIPCA/
 ├── Core Workflow Scripts (5 files)
-│   ├── main.py                          # Master orchestrator
+│   ├── main.py                          # Master orchestrator (loops, logs to logs/)
 │   ├── generate_panel.py                # Unified panel generator
 │   ├── calculate_moments.py             # SDF moments computation
 │   ├── run_fama.py                      # Fama-French & Fama-MacBeth

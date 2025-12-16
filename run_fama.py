@@ -10,7 +10,7 @@ Usage:
 
 Arguments:
     panel_id: Identifier for panel data (e.g., "bgn_0", "kp14_5")
-              Reads from arrays_{panel_id}.pkl
+              Reads from {panel_id}_arrays.pkl
               Output: output/{panel_id}_fama.pkl
 
 Examples:

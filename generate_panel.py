@@ -18,7 +18,7 @@ Examples:
     python generate_panel.py gs21 3
 
 Output:
-    Creates arrays_{model}_{identifier}.pkl in the data directory
+    Creates {model}_{identifier}_arrays.pkl in the data directory
 """
 
 import sys
@@ -119,7 +119,7 @@ def main():
         print("Warning: 'mve' column not found, skipping size calculation")
 
     # Save panel and arrays to data directory
-    arrays_filename = os.path.join(DATA_DIR, f'arrays_{model_name}_{identifier}.pkl')
+    arrays_filename = os.path.join(DATA_DIR, f'{model_name}_{identifier}_arrays.pkl')
 
     print(f"\n{'-'*70}")
     print(f"Saving panel and arrays to {arrays_filename}...")

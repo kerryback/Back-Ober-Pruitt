@@ -41,7 +41,7 @@ TABLES_DIR.mkdir(exist_ok=True)
 
 def load_panel_data(data_dir: str, panel_id: str) -> pd.DataFrame:
     """Load the panel data (excess returns, characteristics, etc.)."""
-    arrays_file = os.path.join(data_dir, f"arrays_{panel_id}.pkl")
+    arrays_file = os.path.join(data_dir, f"{panel_id}_arrays.pkl")
     if os.path.exists(arrays_file):
         with open(arrays_file, 'rb') as f:
             data = pickle.load(f)

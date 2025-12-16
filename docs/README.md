@@ -86,7 +86,7 @@ python calculate_moments.py bgn_0
 python calculate_moments.py kp14_5
 ```
 
-This creates `moments_{panel_id}.pkl` containing pre-computed SDF moments for all months.
+This creates `{panel_id}_moments.pkl` containing pre-computed SDF moments for all months.
 
 ### Memory-Efficient Design
 
@@ -184,7 +184,7 @@ python generate_panel.py bgn 5     # BGN model, identifier 5
 python generate_panel.py kp14 0    # KP14 model, identifier 0
 python generate_panel.py gs21 3    # GS21 model, identifier 3
 ```
-Creates: `arrays_{model}_{identifier}.pkl` (contains both panel and arrays)
+Creates: `{model}_{identifier}_arrays.pkl` (contains both panel and arrays)
 
 **Alternative - model-specific scripts:**
 ```bash
@@ -412,7 +412,7 @@ python main.py bgn
 ```
 
 This runs the complete workflow:
-1. Generates panel data (`arrays_bgn_0.pkl`)
+1. Generates panel data (`bgn_0_arrays.pkl`)
 2. Computes Fama factors (`output/bgn_0_fama.pkl`)
 3. Computes DKKM for multiple feature counts:
    - `output/bgn_0_dkkm_360.pkl`
@@ -507,7 +507,7 @@ panel.set_index(['month', 'firmid'], inplace=True)
 python generate_panel_bgn.py your_id
 ```
 
-This creates `arrays_bgn_your_id.pkl` with your data.
+This creates `bgn_your_id_arrays.pkl` with your data.
 
 3. Analyze your panel:
 ```bash
@@ -525,7 +525,7 @@ panel = pd.read_csv('your_data.csv')
 panel.set_index(['month', 'firmid'], inplace=True)
 
 # Create pickle file (without arr_tuple, SDF computation will be skipped)
-with open('arrays_custom_0.pkl', 'wb') as f:
+with open('custom_0_arrays.pkl', 'wb') as f:
     pickle.dump({'panel': panel, 'N': your_N, 'T': your_T}, f)
 ```
 

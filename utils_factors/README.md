@@ -35,7 +35,7 @@ Shared utilities for factor computation scripts (run_fama.py, run_dkkm.py).
 - `config` (BGN_CONFIG, KP14_CONFIG, GS21_CONFIG, DATA_DIR)
 
 **Files Read:**
-- `{DATA_DIR}/arrays_{panel_id}.pkl` - Panel data with characteristics and returns
+- `{DATA_DIR}/{panel_id}_arrays.pkl` - Panel data with characteristics and returns
 - `{DATA_DIR}/panel_{panel_id}.pkl` - Alternative panel data format
 
 **Files Written:**
@@ -112,7 +112,7 @@ Portfolio statistics computation for factor performance evaluation.
 - `from . import dkkm_functions as dkkm`
 
 **Files Read:**
-- `{DATA_DIR}/moments_{panel_id}.pkl` - Pre-computed SDF conditional moments
+- `{DATA_DIR}/{panel_id}_moments.pkl` - Pre-computed SDF conditional moments
 
 **Statistics Computed:**
 - `stdev` - Standard deviation of factor returns
@@ -288,7 +288,7 @@ from utils import ridge_regression_fast, standardize_columns
 ### Files Read
 
 **Panel Data (via `factor_utils.load_panel_data()`):**
-- `{DATA_DIR}/arrays_{panel_id}.pkl` - Primary panel data source
+- `{DATA_DIR}/{panel_id}_arrays.pkl` - Primary panel data source
   - Contains: panel DataFrame, arrays dict with model outputs
   - Format: `{'panel': pd.DataFrame, 'arrays': dict, ...}`
 
@@ -296,7 +296,7 @@ from utils import ridge_regression_fast, standardize_columns
   - Fallback if arrays file not found
 
 **SDF Moments (via `portfolio_stats.load_precomputed_moments()`):**
-- `{DATA_DIR}/moments_{panel_id}.pkl` - Pre-computed conditional moments
+- `{DATA_DIR}/{panel_id}_moments.pkl` - Pre-computed conditional moments
   - Contains: `{month: {'rp', 'cond_var', 'second_moment', 'second_moment_inv', ...}}`
 
 ### Files Written

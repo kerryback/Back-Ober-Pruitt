@@ -102,7 +102,7 @@ python generate_panel_bgn.py
 
 **Output:**
 - `panel_bgn_baseline.csv` - Panel data (month, firmid, xret, characteristics)
-- `arrays_bgn_baseline.pkl` - Underlying arrays (factors, loadings, etc.)
+- `bgn_baseline_arrays.pkl` - Underlying arrays (factors, loadings, etc.)
 
 ---
 

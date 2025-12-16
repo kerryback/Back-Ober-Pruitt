@@ -12,7 +12,6 @@ from config import (
     GS21_IMIN as imin, GS21_IMAX as imax, GS21_R as r,
     GS21_BURNIN as burnin
 )
-from joblib import Parallel, delayed
 
 from numpy.polynomial.hermite import hermgauss
 import scipy.special

@@ -50,7 +50,7 @@ root/
 ```
 NoIPCA/
 ├── Core Workflow (8 files)
-│   ├── main.py                    # Master orchestrator
+│   ├── main.py                    # Master orchestrator (loops over indices, logs to logs/)
 │   ├── generate_panel.py          # Unified panel generator
 │   ├── calculate_moments.py       # SDF moments
 │   ├── run_fama.py               # Fama-French & Fama-MacBeth
@@ -94,8 +94,8 @@ NoIPCA/
 │       └── [21 CSV files]
 │
 ├── outputs/                      # All output files (relative to NoIPCA/)
-│   ├── arrays_{panel_id}.pkl
-│   ├── moments_{panel_id}.pkl
+│   ├── {panel_id}_arrays.pkl
+│   ├── {panel_id}_moments.pkl
 │   ├── {panel_id}_fama.pkl
 │   └── {panel_id}_dkkm_{nfeatures}.pkl
 │
@@ -283,11 +283,11 @@ NoIPCA/
 ### File Naming
 
 **Panel data:**
-- `outputs/arrays_{panel_id}.pkl` - Panel data with characteristics and returns
+- `outputs/{panel_id}_arrays.pkl` - Panel data with characteristics and returns
 - `outputs/panel_{panel_id}.pkl` - Legacy format (fallback)
 
 **Moments:**
-- `outputs/moments_{panel_id}.pkl` - Pre-computed SDF conditional moments
+- `outputs/{panel_id}_moments.pkl` - Pre-computed SDF conditional moments
 
 **Factor results:**
 - `outputs/{panel_id}_fama.pkl` - Fama-French & Fama-MacBeth results

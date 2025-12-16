@@ -12,7 +12,6 @@ from scipy.optimize import fsolve
 from .vasicek import *
 from scipy import interpolate
 from scipy.interpolate import RegularGridInterpolator
-from joblib import Parallel, delayed
 from config import (
     PI as pi, RBAR as rbar, KAPPA as kappa, SIGMA_R as sigma_r,
     SIGMA_Z as sigma_z, CBAR as Cbar, CHAT as Chat,

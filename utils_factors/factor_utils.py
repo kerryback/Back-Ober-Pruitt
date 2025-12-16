@@ -114,7 +114,7 @@ def load_panel_data(panel_id: str, model_name: str) -> Tuple[pd.DataFrame, Dict[
     Raises:
         SystemExit: If file not found
     """
-    arrays_path = os.path.join(DATA_DIR, f"arrays_{panel_id}.pkl")
+    arrays_path = os.path.join(DATA_DIR, f"{panel_id}_arrays.pkl")
 
     if not os.path.exists(arrays_path):
         print(f"ERROR: Arrays file not found at: {arrays_path}")

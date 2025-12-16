@@ -20,7 +20,6 @@ from config import (
 
 # Define A function (from parameters_kp14.py)
 A = lambda ep, u: (A_0 + (ep - 1) * A_1 + (u - 1) * A_2 + (ep - 1) * (u - 1) * A_3)
-from joblib import Parallel, delayed
 
 import scipy.special
 from scipy.sparse import csr_matrix, diags, kron, vstack
@@ -28,9 +27,7 @@ from scipy.sparse import csr_matrix, diags, kron, vstack
 # sdf_compute( ) computes second moment of returns after loading integrals computed in integ_kp14
 
 ### STOPPED FOR NOW -- should check everything carefully again after checking overleaf
-## the top level code and sdf_loop run currently 
-
-n_jobs = 7 # number of jobs in parallelized tasks
+## the top level code and sdf_loop run currently
 
 # Get path to solution files relative to this module
 _SOLFILES_DIR = os.path.join(os.path.dirname(__file__), 'KP14_solfiles')
