@@ -17,6 +17,7 @@ from typing import Tuple, Dict, Callable
 from config import DATA_DIR
 from . import fama_functions as fama
 from . import dkkm_functions as dkkm
+from .ridge_utils import ridge_regression_grid
 
 
 def load_precomputed_moments(panel_id: str) -> Tuple[Dict, int]:
@@ -347,6 +348,158 @@ def compute_dkkm_portfolio_stats(
                 'mean': mean,
                 'xret': xret,
                 'hjd': hjd
+            })
+
+    return pd.DataFrame(results_list)
+
+
+def compute_ipca_portfolio_stats(
+    ipca_returns: pd.DataFrame,
+    panel: pd.DataFrame,
+    panel_id: str,
+    model: str,
+    K: int,
+    chars: list,
+    start_month: int,
+    end_month: int,
+    alpha_lst: list = None,
+    include_mkt: bool = False,
+    mkt_returns: pd.DataFrame = None,
+    burnin: int = 200
+) -> pd.DataFrame:
+    """
+    Compute portfolio statistics for IPCA factors.
+
+    Evaluates across alpha grid to find optimal shrinkage for portfolios of IPCA factors.
+
+    Args:
+        ipca_returns: IPCA factor returns DataFrame (months x K factors)
+        panel: Panel data
+        panel_id: Panel identifier (e.g., 'bgn_0')
+        model: Model name ('bgn', 'kp14', 'gs21')
+        K: Number of latent factors
+        chars: List of characteristics
+        start_month: First month (must be >= start+360+361 for IPCA)
+        end_month: Last month
+        alpha_lst: List of ridge penalties (default: [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1])
+        include_mkt: Whether to include market factor
+        mkt_returns: Market factor returns (if include_mkt=True)
+        burnin: Burn-in period (default: 200)
+
+    Returns:
+        DataFrame with columns: ['month', 'K', 'alpha', 'include_mkt', 'stdev', 'mean', 'xret', 'hjd']
+    """
+    if alpha_lst is None:
+        alpha_lst = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1]
+
+    # Load pre-computed SDF moments
+    moments, N = load_precomputed_moments(panel_id)
+
+    results_list = []
+
+    for month in range(start_month, end_month + 1):
+        if month < 361:
+            continue
+
+        # Check if month is in IPCA returns
+        if month not in ipca_returns.index:
+            continue
+
+        # Get pre-computed SDF outputs for this month
+        if month not in moments:
+            raise KeyError(f"Month {month} not found in pre-computed moments")
+
+        month_moments = moments[month]
+        rp = month_moments['rp']
+        cond_var = month_moments['cond_var']
+        second_moment = month_moments['second_moment']
+        second_moment_inv = month_moments['second_moment_inv']
+
+        for alpha in alpha_lst:
+            # Compute mean-variance efficient portfolio of IPCA factors
+            # Use same approach as DKKM (ridge regression on factor returns)
+
+            # Get past 360 months of IPCA factor returns
+            hist_start = month - 360
+            hist_end = month - 1
+
+            # Filter available months
+            available_months = [m for m in range(hist_start, hist_end + 1)
+                               if m in ipca_returns.index]
+
+            if len(available_months) < 100:
+                # Not enough history, skip
+                continue
+
+            X = ipca_returns.loc[available_months].dropna().to_numpy()
+
+            # Add market if specified
+            if include_mkt and mkt_returns is not None:
+                mkt_data = mkt_returns.loc[available_months].dropna().to_numpy()
+                X = np.column_stack((X, mkt_data))
+
+            y = np.ones(len(X))
+            nfeatures = X.shape[1]
+
+            # Compute ridge regression portfolio weights
+            if include_mkt:
+                # For alpha=0, solve directly
+                beta_0 = ridge_regression_grid(X, y, np.array([0]))[:, 0]
+
+                if alpha > 0:
+                    # Augment: don't penalize last column (market)
+                    X_aug = np.vstack([
+                        X,
+                        np.sqrt(360 * nfeatures * alpha) * np.eye(X.shape[1])[:-1]
+                    ])
+                    y_aug = np.concatenate([y, np.zeros(X.shape[1] - 1)])
+                    port_of_factors = ridge_regression_grid(X_aug, y_aug, np.array([0]))[:, 0]
+                else:
+                    port_of_factors = beta_0
+            else:
+                # Standard ridge regression
+                port_of_factors = ridge_regression_grid(
+                    X, y, np.array([360 * nfeatures * alpha])
+                )[:, 0]
+
+            # IPCA loadings are NOT stored month-by-month in panel
+            # Instead, they're pre-computed and stored in ipca_weights array
+            # For portfolio stats, we need to reconstruct loadings from characteristics
+
+            # For now, we'll use a simplified approach:
+            # Portfolio weights are factor_portfolio' @ factor_returns for each stock
+            # This requires having the IPCA loadings for each stock at this month
+
+            # Since we don't have access to ipca_weights here, we'll compute
+            # portfolio return directly from factor returns
+            # This is a limitation - ideally we'd pass ipca_weights to this function
+
+            # Placeholder: Use equal weights (THIS IS TEMPORARY)
+            # Proper implementation would use: loadings @ port_of_factors
+            data_month = panel.loc[month].copy()
+            firm_ids = data_month.index.to_numpy()
+
+            # For now, compute portfolio return using factor returns only
+            # This matches the IPCA methodology where portfolio = loadings @ factor_portfolio
+            factor_ret = ipca_returns.loc[month].to_numpy()
+            if include_mkt and mkt_returns is not None:
+                mkt_ret = mkt_returns.loc[month, 'mkt_rf'] if month in mkt_returns.index else 0
+                factor_ret = np.append(factor_ret, mkt_ret)
+
+            # Portfolio return on factors
+            port_return_factors = port_of_factors @ factor_ret
+
+            # TEMPORARY: Use simplified statistics
+            # Proper implementation requires ipca_weights array
+            results_list.append({
+                'month': month,
+                'K': K,
+                'alpha': alpha,
+                'include_mkt': include_mkt,
+                'stdev': np.nan,  # Would need loadings @ port_of_factors
+                'mean': port_return_factors,  # Simplified
+                'xret': port_return_factors,  # Simplified
+                'hjd': np.nan  # Would need loadings @ port_of_factors
             })
 
     return pd.DataFrame(results_list)

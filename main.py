@@ -1,5 +1,5 @@
 """
-NoIPCA - Master Orchestration Script
+Back-Ober-Pruitt - Master Orchestration Script
 
 Runs the complete workflow for a range of panel identifiers:
 1. Generate panel data
@@ -172,7 +172,7 @@ def main():
 
     try:
         print("="*70)
-        print("NoIPCA - COMPLETE WORKFLOW")
+        print("BACK-OBER-PRUITT - COMPLETE WORKFLOW")
         print("="*70)
         print(f"Started at {datetime.now().strftime('%a %d %b %Y, %I:%M%p')}")
         print()

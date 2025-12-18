@@ -37,8 +37,8 @@ try:
     from utils_factors import factor_utils
 except ImportError as e:
     print(f"Import error: {e}")
-    print("Make sure you're running from the NoIPCA directory:")
-    print("  cd NoIPCA")
+    print("Make sure you're running from the Back-Ober-Pruitt directory:")
+    print("  cd Back-Ober-Pruitt")
     print("  python run_fama.py")
     sys.exit(1)
 

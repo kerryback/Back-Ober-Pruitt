@@ -1,1 +1,1 @@
-"""NoIPCA package - Factor models without IPCA."""
+"""Back-Ober-Pruitt package - Factor models without IPCA."""

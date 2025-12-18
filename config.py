@@ -10,8 +10,8 @@ import os
 # PANEL DIMENSIONS - CONFIGURE THESE FIRST
 # =============================================================================
 
-N = 1000  # Number of firms
-T = 720   # Number of time periods (excluding burnin)
+N = 100  # Number of firms
+T = 400   # Number of time periods (excluding burnin)
 BGN_BURNIN = 200  # BGN burnin period
 KP14_BURNIN = 200  # KP14 burnin period
 GS21_BURNIN = 200  # GS21 burnin period
@@ -52,6 +52,22 @@ STDZ_FM = False  # Standardize characteristics in Fama-MacBeth (False matches or
 # Ridge regression optimization
 RIDGE_SVD_THRESHOLD = 1000  # Use randomized SVD when D > threshold
 RIDGE_SVD_RANK = 500  # Rank approximation for randomized SVD
+
+# =============================================================================
+# IPCA PARAMETERS
+# =============================================================================
+
+# IPCA estimation parameters
+IPCA_K_VALUES = [1, 2, 3]  # Number of latent factors to estimate
+IPCA_N_RESTARTS = 3  # Random restarts for first window (robustness)
+IPCA_MAX_ITERATIONS = 100  # Max iterations for Stiefel optimization
+IPCA_SIGN_NORMALIZE = True  # Apply sign normalization (positive mean)
+IPCA_WARM_START = True  # Warm-start from previous window
+IPCA_VERBOSITY = 0  # 0=silent, 1=minimal, 2=detailed
+
+# IPCA portfolio parameters
+IPCA_INCLUDE_MKT = True  # Include market in IPCA portfolios
+IPCA_ALPHA_LST = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1]  # Ridge penalties for portfolios
 
 # =============================================================================
 # MODEL CHARACTERISTICS AND FACTOR NAMES
@@ -222,5 +238,14 @@ def get_model_config(model_name):
         'alpha_lst': MODEL_ALPHA_LST[model_name],
         'stdz_fm': STDZ_FM,
         'ridge_svd_threshold': RIDGE_SVD_THRESHOLD,
-        'ridge_svd_rank': RIDGE_SVD_RANK
+        'ridge_svd_rank': RIDGE_SVD_RANK,
+        # IPCA parameters
+        'ipca_k_values': IPCA_K_VALUES,
+        'ipca_n_restarts': IPCA_N_RESTARTS,
+        'ipca_max_iterations': IPCA_MAX_ITERATIONS,
+        'ipca_sign_normalize': IPCA_SIGN_NORMALIZE,
+        'ipca_warm_start': IPCA_WARM_START,
+        'ipca_verbosity': IPCA_VERBOSITY,
+        'ipca_include_mkt': IPCA_INCLUDE_MKT,
+        'ipca_alpha_lst': IPCA_ALPHA_LST
     }

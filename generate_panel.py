@@ -86,12 +86,11 @@ def main():
         sys.exit(1)
 
     # Get model configuration
-    from config import get_model_config
+    from config import get_model_config, N, T
     model_config = get_model_config(model_name)
 
-    # Parameters for panel generation
-    N = 1000  # number of firms
-    T = 720   # number of time periods (not including burnin)
+    # Parameters for panel generation (from config.py)
+    # N and T are imported from config
 
     chars = model_config['chars']  # Characteristics defined in config.py
 

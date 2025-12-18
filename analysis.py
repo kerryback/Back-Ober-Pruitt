@@ -1,15 +1,14 @@
 """
-Analysis script to produce LaTeX tables and figures from NoIPCA results.
+Analysis script to produce LaTeX tables and figures from Back-Ober-Pruitt results.
 
-This script replicates the analysis from analysis.ipynb, adapted to work with
-the NoIPCA pickle file structure.
+This script automatically discovers and analyzes all panels for each model (BGN, KP14, GS21).
 
 Usage:
     python analysis.py
 
 Outputs:
-    - Figures saved to NoIPCA/figures/
-    - LaTeX tables saved to NoIPCA/tables/
+    - Figures saved to Back-Ober-Pruitt/figures/
+    - LaTeX tables saved to Back-Ober-Pruitt/tables/
 """
 
 import os
@@ -18,7 +17,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import ttest_1samp
 import pickle
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -38,66 +36,43 @@ TABLES_DIR = SCRIPT_DIR / "tables"
 FIGURES_DIR.mkdir(exist_ok=True)
 TABLES_DIR.mkdir(exist_ok=True)
 
-
-def load_panel_data(data_dir: str, panel_id: str) -> pd.DataFrame:
-    """Load the panel data (excess returns, characteristics, etc.)."""
-    arrays_file = os.path.join(data_dir, f"{panel_id}_arrays.pkl")
-    if os.path.exists(arrays_file):
-        with open(arrays_file, 'rb') as f:
-            data = pickle.load(f)
-            return data['panel']
-    return None
+# Configuration
+MODELS = ['bgn', 'kp14', 'gs21']
+DKKM_NFEATURES = [6, 36, 360]
+IPCA_K_VALUES = [1, 2, 3]
 
 
-def compute_monthly_stats(returns_df: pd.DataFrame, portfolio_weights: np.ndarray,
-                         panel_data: pd.DataFrame, start: int, end: int) -> List[Dict]:
+def discover_panels(model: str) -> List[int]:
     """
-    Compute monthly statistics for factor returns.
+    Discover all available panel indices for a given model by scanning pickle files.
 
     Args:
-        returns_df: DataFrame of factor returns (T x K)
-        portfolio_weights: Portfolio weights for SDF (optional, can be None)
-        panel_data: Panel data with excess returns
-        start: Start month
-        end: End month
+        model: Model name ('bgn', 'kp14', 'gs21')
 
     Returns:
-        List of dictionaries with monthly statistics
+        Sorted list of panel indices
     """
-    stats = []
+    panels = set()
 
-    for month in range(start, end + 1):
-        # Get excess returns for this month
-        month_data = panel_data[panel_data['month'] == month]
-        if len(month_data) == 0:
-            continue
+    # Scan for fama files (most likely to exist)
+    pattern = os.path.join(DATA_DIR, f"{model}_*_fama.pkl")
+    for filepath in glob.glob(pattern):
+        # Extract index from filename: model_index_fama.pkl
+        filename = Path(filepath).stem
+        parts = filename.split('_')
+        if len(parts) >= 3 and parts[1].isdigit():
+            panels.add(int(parts[1]))
 
-        xret = month_data['xret'].values
-
-        # For Fama methods, we don't have explicit SDF portfolios in the same way
-        # We'll need to compute this differently
-        stats.append({
-            'month': month,
-            'xret': xret.mean(),
-            'mn': returns_df.iloc[month - start].mean() if month - start < len(returns_df) else np.nan,
-            'stdev': returns_df.iloc[month - start].std() if month - start < len(returns_df) else np.nan,
-        })
-
-    return stats
+    return sorted(list(panels))
 
 
-def load_fama_results(data_dir: str, model: str, n_panels: int) -> pd.DataFrame:
-    """
-    Load Fama-French and Fama-MacBeth results from pickle files.
-
-    Returns DataFrame with columns: panel, method, alpha, month, mean, stdev, xret, hjd
-    """
-    print("  Loading Fama results...")
+def load_fama_results(model: str, panel_indices: List[int]) -> pd.DataFrame:
+    """Load Fama results for all panels of a model."""
     all_results = []
 
-    for i in range(n_panels):
-        panel_id = f"{model}_{i}"
-        fama_file = os.path.join(data_dir, f"{panel_id}_fama.pkl")
+    for panel_idx in panel_indices:
+        panel_id = f"{model}_{panel_idx}"
+        fama_file = os.path.join(DATA_DIR, f"{panel_id}_fama.pkl")
 
         if not os.path.exists(fama_file):
             continue
@@ -105,38 +80,30 @@ def load_fama_results(data_dir: str, model: str, n_panels: int) -> pd.DataFrame:
         with open(fama_file, 'rb') as f:
             fama_data = pickle.load(f)
 
-        # Get the stats dataframe which has monthly data
+        # Get the stats dataframe
         fama_stats = fama_data.get('fama_stats')
-        if fama_stats is not None:
-            # Add panel identifier
+        if fama_stats is not None and len(fama_stats) > 0:
             fama_stats = fama_stats.copy()
-            fama_stats['panel'] = i
+            fama_stats['panel'] = panel_idx
+            fama_stats['model_type'] = model
             all_results.append(fama_stats)
 
     if all_results:
-        df = pd.concat(all_results, ignore_index=True)
-        print(f"    Loaded {len(df)} Fama observations from {df['panel'].nunique()} panels")
-        return df
+        return pd.concat(all_results, ignore_index=True)
     else:
-        print("    No Fama results found")
         return pd.DataFrame()
 
 
-def load_dkkm_results(data_dir: str, model: str, n_panels: int,
-                     nfeatures_list: List[int] = [6, 36, 360]) -> pd.DataFrame:
-    """
-    Load DKKM results from pickle files.
-
-    Returns DataFrame with columns: panel, factors, kappa, sharpe, max_sr
-    """
-    print("  Loading DKKM results...")
+def load_dkkm_results(model: str, panel_indices: List[int],
+                      nfeatures_list: List[int] = DKKM_NFEATURES) -> pd.DataFrame:
+    """Load DKKM results for all panels of a model."""
     all_results = []
 
-    for i in range(n_panels):
-        panel_id = f"{model}_{i}"
+    for panel_idx in panel_indices:
+        panel_id = f"{model}_{panel_idx}"
 
         for nfeatures in nfeatures_list:
-            dkkm_file = os.path.join(data_dir, f"{panel_id}_dkkm_{nfeatures}.pkl")
+            dkkm_file = os.path.join(DATA_DIR, f"{panel_id}_dkkm_{nfeatures}.pkl")
 
             if not os.path.exists(dkkm_file):
                 continue
@@ -144,431 +111,233 @@ def load_dkkm_results(data_dir: str, model: str, n_panels: int,
             with open(dkkm_file, 'rb') as f:
                 dkkm_data = pickle.load(f)
 
-            # Get the stats dataframe which has monthly data
+            # Get the stats dataframe
             dkkm_stats = dkkm_data.get('dkkm_stats')
-            if dkkm_stats is not None:
-                # Add panel identifier and nfeatures
+            if dkkm_stats is not None and len(dkkm_stats) > 0:
                 dkkm_stats = dkkm_stats.copy()
-                dkkm_stats['panel'] = i
+                dkkm_stats['panel'] = panel_idx
+                dkkm_stats['model_type'] = model
                 dkkm_stats['factors'] = nfeatures
                 all_results.append(dkkm_stats)
 
     if all_results:
-        df = pd.concat(all_results, ignore_index=True)
-        print(f"    Loaded {len(df)} DKKM observations from {df['panel'].nunique()} panels")
-        return df
+        return pd.concat(all_results, ignore_index=True)
     else:
-        print("    No DKKM results found")
         return pd.DataFrame()
 
 
-def load_results(data_dir: str, model: str = 'bgn', n_panels: int = 300,
-                nfeatures_list: List[int] = [6, 36, 360]) -> Dict:
-    """
-    Load all results from pickle files.
+def load_ipca_results(model: str, panel_indices: List[int],
+                      K_list: List[int] = IPCA_K_VALUES) -> pd.DataFrame:
+    """Load IPCA results for all panels of a model."""
+    all_results = []
 
-    Args:
-        data_dir: Directory containing pickle files
-        model: Model name (bgn, kp14, gs21)
-        n_panels: Number of panel iterations to load
-        nfeatures_list: List of DKKM feature counts to load
+    for panel_idx in panel_indices:
+        panel_id = f"{model}_{panel_idx}"
 
-    Returns:
-        Dictionary with 'fama' and 'dkkm' DataFrames
-    """
-    print(f"Loading results from {data_dir}...")
-    print(f"  Model: {model}")
-    print(f"  Number of panels: {n_panels}")
-    print(f"  DKKM features: {nfeatures_list}")
+        for K in K_list:
+            ipca_file = os.path.join(DATA_DIR, f"{panel_id}_ipca_{K}.pkl")
 
-    fama_df = load_fama_results(data_dir, model, n_panels)
-    dkkm_df = load_dkkm_results(data_dir, model, n_panels, nfeatures_list)
+            if not os.path.exists(ipca_file):
+                continue
 
-    return {
-        'fama': fama_df,
-        'dkkm': dkkm_df
-    }
+            with open(ipca_file, 'rb') as f:
+                ipca_data = pickle.load(f)
 
+            # Get the stats dataframe
+            ipca_stats = ipca_data.get('ipca_stats')
+            if ipca_stats is not None and len(ipca_stats) > 0:
+                ipca_stats = ipca_stats.copy()
+                ipca_stats['panel'] = panel_idx
+                ipca_stats['model_type'] = model
+                ipca_stats['factors'] = K
+                all_results.append(ipca_stats)
 
-def create_means_figure(dkkm: pd.DataFrame, kps: pd.DataFrame,
-                       ffc: pd.DataFrame, fmr: pd.DataFrame,
-                       output_path: str):
-    """
-    Create the combined means figure with 4 subplots.
-
-    Args:
-        dkkm: DKKM results DataFrame
-        kps: KPS/IPCA results DataFrame
-        ffc: Fama-French results DataFrame
-        fmr: Fama-MacBeth results DataFrame
-        output_path: Path to save figure
-    """
-    print("Creating means figure...")
-
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(8, 8))
-
-    # DKKM Sharpe plot
-    dkkm_filtered = dkkm[dkkm['kappa'] != 0].copy()
-    mean_sharpe = dkkm_filtered.groupby(["kappa", "factors"]).sharpe.mean().reset_index()
-    sns.lineplot(data=mean_sharpe, x='factors', y='sharpe', hue='kappa',
-                marker='o', linewidth=2, ax=ax1)
-    ax1.set_xlabel('DKKM Factors', fontsize=10)
-    ax1.set_title('(a) DKKM Sharpe Ratio')
-    ax1.set_ylabel('', fontsize=12)
-    ax1.legend(title='Kappa', fontsize=10)
-    ax1.set_xscale('log')
-    ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
-
-    # DKKM HJD plot
-    mean_hjd = dkkm_filtered.groupby(["kappa", "factors"]).hjd.mean().reset_index()
-    sns.lineplot(data=mean_hjd, x='factors', y='hjd', hue='kappa',
-                marker='o', linewidth=2, ax=ax2)
-    ax2.set_xlabel('DKKM Factors', fontsize=10)
-    ax2.set_title('(b) DKKM HJ Distance')
-    ax2.set_ylabel('')
-    ax2.legend(title='Kappa', fontsize=10)
-    ax2.set_xscale('log')
-    ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
-
-    # KPS Sharpe plot
-    max_sharpe = dkkm[(dkkm.factors==6) & (dkkm.kappa==0.05)].max_sr.mean()
-    mean_sharpe = kps.groupby(["factors"]).sharpe.mean().reset_index()
-    sns.lineplot(data=mean_sharpe, x='factors', y='sharpe', marker='o',
-                linewidth=1, ax=ax3, label="KPS")
-    sns.lineplot(x=[1, 6], y=[fmr.sharpe.mean()]*2, ax=ax3, label="FMR")
-    sns.lineplot(x=[1, 6], y=[ffc.sharpe.mean()]*2, ax=ax3, label="FFC")
-    sns.lineplot(x=[1, 6], y=[max_sharpe]*2, ax=ax3, label="Max SR")
-
-    ax3.set_xlabel('KPS Factors', fontsize=10)
-    ax3.set_title('(c) Sharpe Ratio')
-    ax3.set_ylabel('', fontsize=12)
-    ax3.legend(fontsize=10)
-    ax3.grid(True, which='both', linestyle='--', linewidth=0.5)
-
-    # KPS HJD plot
-    mean_hjd = kps.groupby(["factors"]).hjd.mean().reset_index()
-    sns.lineplot(data=mean_hjd, x='factors', y='hjd', marker='o',
-                linewidth=1, ax=ax4, label="KPS")
-    sns.lineplot(x=[1, 6], y=[fmr.hjd.mean()]*2, ax=ax4, label="FMR")
-    sns.lineplot(x=[1, 6], y=[ffc.hjd.mean()]*2, ax=ax4, label="FFC")
-    ax4.set_xlabel('KPS Factors', fontsize=10)
-    ax4.set_title('(d) HJ Distance')
-    ax4.set_ylabel('')
-    ax4.legend()
-    ax4.grid(True, which='both', linestyle='--', linewidth=0.5)
-
-    fig.tight_layout()
-    fig.savefig(output_path)
-    print(f"  Saved to {output_path}")
-    plt.close()
+    if all_results:
+        return pd.concat(all_results, ignore_index=True)
+    else:
+        return pd.DataFrame()
 
 
-def create_dkkm_sharpe_figure(dkkm: pd.DataFrame, output_path: str):
-    """Create DKKM Sharpe ratios figure."""
-    print("Creating DKKM Sharpe figure...")
+def create_dkkm_figure(dkkm: pd.DataFrame, ffc: pd.DataFrame, fmr: pd.DataFrame,
+                       output_path: str, model: str = 'bgn'):
+    """Create DKKM figure with Sharpe and HJD panels."""
+    print(f"  Creating DKKM figure for {model.upper()}...")
 
-    fig, ax1 = plt.subplots(figsize=(6, 4))
+    # Filter out kappa = 0 and apply model-specific range
+    if model == 'gs21':
+        lb, ub = 0.00001, 0.001
+    else:  # bgn or kp14
+        lb, ub = 0.01, 0.1
 
-    dkkm_filtered = dkkm[dkkm['kappa'] != 0].copy()
-    print(f"  Filtered DKKM data: {len(dkkm_filtered)} observations")
+    dkkm_filtered = dkkm[(dkkm['kappa'] >= lb) & (dkkm['kappa'] <= ub)].copy()
 
     if len(dkkm_filtered) == 0:
-        print("  WARNING: No data after filtering kappa != 0")
-        plt.close()
+        print(f"    WARNING: No data after filtering for {model}")
         return
 
-    mean_sharpe = dkkm_filtered.groupby(["kappa", "factors"]).sharpe.mean().reset_index()
-    print(f"  Mean sharpe data: {len(mean_sharpe)} observations")
-    print(f"  Columns: {list(mean_sharpe.columns)}")
-    print(f"  Data types: {mean_sharpe.dtypes.to_dict()}")
-    print(f"  First few rows:")
-    print(mean_sharpe.head())
+    # Compute group means across panels
+    mean_sharpe = dkkm_filtered.groupby(['kappa', 'factors'])['sharpe'].mean().reset_index()
+    mean_hjd = dkkm_filtered.groupby(['kappa', 'factors'])['hjd'].mean().reset_index()
 
-    if len(mean_sharpe) == 0:
-        print("  WARNING: No data after groupby")
-        plt.close()
-        return
+    # Create side-by-side panels
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-    # Check for NaN/Inf values
-    if mean_sharpe['sharpe'].isna().any():
-        print(f"  WARNING: {mean_sharpe['sharpe'].isna().sum()} NaN values in sharpe")
-        mean_sharpe = mean_sharpe.dropna()
+    # Left panel: Sharpe ratios
+    for kappa in mean_sharpe['kappa'].unique():
+        data = mean_sharpe[mean_sharpe['kappa'] == kappa]
+        ax1.plot(data['factors'], data['sharpe'], marker='o', linewidth=2, label=f'$\\kappa$={kappa:.4g}')
 
-    if len(mean_sharpe) == 0:
-        print("  WARNING: No data after dropping NaN")
-        plt.close()
-        return
-
-    sns.lineplot(data=mean_sharpe, x='factors', y='sharpe', hue='kappa',
-                marker='o', linewidth=2, ax=ax1)
-    ax1.set_xlabel('Number of Factors', fontsize=14)
-    ax1.set_ylabel('', fontsize=12)
-    ax1.legend(title='Penalization', fontsize=10)
+    ax1.axhline(ffc.sharpe.mean(), linewidth=2, label='FFC', color='lightgreen', linestyle='--')
+    ax1.axhline(fmr.sharpe.mean(), linewidth=2, label='FMR', color='brown', linestyle='--')
+    ax1.set_xlabel('Number of DKKM Factors', fontsize=12)
+    ax1.set_ylabel('Mean Sharpe Ratio', fontsize=12)
     ax1.set_xscale('log')
-    ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+    ax1.set_title(f'(a) Sharpe Ratios - {model.upper()}')
+    ax1.legend(fontsize=9, loc='best')
+    ax1.grid(True, alpha=0.3)
 
-    fig.tight_layout()
-    fig.savefig(output_path)
-    print(f"  Saved to {output_path}")
-    plt.close()
+    # Right panel: HJ distances
+    for kappa in mean_hjd['kappa'].unique():
+        data = mean_hjd[mean_hjd['kappa'] == kappa]
+        ax2.plot(data['factors'], data['hjd'], marker='o', linewidth=2, label=f'$\\kappa$={kappa:.4g}')
 
-
-def create_kps_sharpe_figure(dkkm: pd.DataFrame, kps: pd.DataFrame,
-                             ffc: pd.DataFrame, fmr: pd.DataFrame,
-                             output_path: str):
-    """Create KPS Sharpe ratios figure."""
-    print("Creating KPS Sharpe figure...")
-
-    fig, ax3 = plt.subplots(figsize=(6, 4))
-
-    max_sharpe = dkkm[(dkkm.factors==6) & (dkkm.kappa==0.05)].max_sr.mean()
-    mean_sharpe = kps.groupby(["factors"]).sharpe.mean().reset_index()
-    sns.lineplot(data=mean_sharpe, x='factors', y='sharpe', marker='o',
-                linewidth=1, ax=ax3, label="KPS")
-    sns.lineplot(x=[1, 6], y=[fmr.sharpe.mean()]*2, ax=ax3, label="FMR")
-    sns.lineplot(x=[1, 6], y=[ffc.sharpe.mean()]*2, ax=ax3, label="FFC")
-    sns.lineplot(x=[1, 6], y=[max_sharpe]*2, ax=ax3, label="Max SR")
-
-    ax3.set_xlabel('Number of IPCA Factors', fontsize=14)
-    ax3.set_ylabel('', fontsize=12)
-    ax3.legend(fontsize=10)
-    ax3.grid(True, which='both', linestyle='--', linewidth=0.5)
-
-    fig.tight_layout()
-    fig.savefig(output_path)
-    print(f"  Saved to {output_path}")
-    plt.close()
-
-
-def create_densities_figure(dkkm: pd.DataFrame, kps: pd.DataFrame,
-                            fmr: pd.DataFrame, output_path: str):
-    """Create densities figure with Sharpe and HJD distributions."""
-    print("Creating densities figure...")
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
-
-    dkkm_subset = dkkm[(dkkm.kappa == 0.05) & (dkkm.factors == 360)]
-    kps_subset = kps[kps.factors == 2]
-
-    # Sharpe ratios
-    sns.kdeplot(data=dkkm_subset.sharpe, fill=True, alpha=0.5, label='DKKM', ax=ax1)
-    sns.kdeplot(data=kps_subset.sharpe, fill=True, alpha=0.5, label='KPS', ax=ax1)
-    sns.kdeplot(data=fmr.sharpe, fill=True, alpha=0.5, label='FMR', ax=ax1)
-    ax1.set_xlabel('Sharpe Ratio')
-    ax1.set_ylabel('Density')
-    ax1.legend()
-
-    # HJD
-    sns.kdeplot(data=dkkm_subset.hjd, fill=True, alpha=0.5, label='DKKM', ax=ax2)
-    sns.kdeplot(data=kps_subset.hjd, fill=True, alpha=0.5, label='KPS', ax=ax2)
-    sns.kdeplot(data=fmr.hjd, fill=True, alpha=0.5, label='FMR', ax=ax2)
-    ax2.set_xlabel('Hansen-Jagannathan Distance')
-    ax2.set_ylabel('')
-    ax2.legend()
+    ax2.axhline(ffc.hjd.mean(), linewidth=2, label='FFC', color='lightgreen', linestyle='--')
+    ax2.axhline(fmr.hjd.mean(), linewidth=2, label='FMR', color='brown', linestyle='--')
+    ax2.set_xlabel('Number of DKKM Factors', fontsize=12)
+    ax2.set_ylabel('Hansen-Jagannathan Distance', fontsize=12)
+    ax2.set_xscale('log')
+    ax2.set_title(f'(b) HJ Distances - {model.upper()}')
+    ax2.legend(fontsize=9, loc='best')
+    ax2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(output_path)
-    print(f"  Saved to {output_path}")
+    plt.savefig(output_path, bbox_inches='tight')
+    print(f"    Saved to {output_path}")
     plt.close()
 
 
-def create_fama_table(ffc: pd.DataFrame, fmr: pd.DataFrame,
-                     output_path: str, n_panels: int = 300):
-    """Create Fama comparison table."""
-    print("Creating Fama comparison table...")
+def create_fama_table(fama_all: pd.DataFrame, output_path: str):
+    """Create Fama comparison table for all models."""
+    print("  Creating Fama comparison table...")
 
-    table = pd.DataFrame(
-        index=["FMR", "FFC", "FMR - FFC", "t-stat", "p-value"],
-        columns=["Sharpe Ratio", "HJ Distance"],
-        dtype=float
-    )
+    latex_table = r"\begin{table}[h]" + "\n"
+    latex_table += r"\centering" + "\n"
+    latex_table += r"\begin{tabular}{llrr}" + "\n"
+    latex_table += r"\toprule" + "\n"
+    latex_table += r"Model & Method & Sharpe Ratio & HJ Distance \\" + "\n"
+    latex_table += r"\midrule" + "\n"
 
-    ffc_hjd = ffc.groupby("panel").hjd.mean()
-    fmr_hjd = fmr.groupby("panel").hjd.mean()
+    for model in MODELS:
+        model_data = fama_all[fama_all['model_type'] == model]
+        if len(model_data) == 0:
+            continue
 
-    table.loc["FMR", "Sharpe Ratio"] = fmr.sharpe.mean()
-    table.loc["FMR", "HJ Distance"] = fmr_hjd.mean()
-    table.loc["FFC", "Sharpe Ratio"] = ffc.sharpe.mean()
-    table.loc["FFC", "HJ Distance"] = ffc_hjd.mean()
-    table.loc["FMR - FFC", "Sharpe Ratio"] = fmr.sharpe.mean() - ffc.sharpe.mean()
-    table.loc["FMR - FFC", "HJ Distance"] = fmr_hjd.mean() - ffc_hjd.mean()
+        # Get number of panels for this model
+        n_panels = model_data['panel'].nunique()
 
-    test = ttest_1samp(
-        fmr.groupby("panel").sharpe.mean().to_numpy()
-        - ffc.groupby("panel").sharpe.mean().to_numpy(),
-        0
-    )
-    table.loc["t-stat", "Sharpe Ratio"] = test[0]
-    table.loc["p-value", "Sharpe Ratio"] = test[1]
+        # Aggregate by method
+        for method, label in [('fm', 'FMR'), ('ff', 'FFC')]:
+            method_data = model_data[model_data['method'] == method]
+            if len(method_data) > 0:
+                sharpe = method_data['sharpe'].mean()
+                hjd = method_data['hjd'].mean()
+                latex_table += f"{model.upper()} & {label} & {sharpe:.4f} & {hjd:.4f} \\\\\n"
 
-    test = ttest_1samp(
-        fmr_hjd.to_numpy() - ffc_hjd.to_numpy(),
-        0
-    )
-    table.loc["t-stat", "HJ Distance"] = test[0]
-    table.loc["p-value", "HJ Distance"] = test[1]
+        # Add difference row
+        fmr_data = model_data[model_data['method'] == 'fm']
+        ffc_data = model_data[model_data['method'] == 'ff']
+        if len(fmr_data) > 0 and len(ffc_data) > 0:
+            sharpe_diff = fmr_data['sharpe'].mean() - ffc_data['sharpe'].mean()
+            hjd_diff = fmr_data['hjd'].mean() - ffc_data['hjd'].mean()
+            latex_table += f"{model.upper()} & FMR - FFC & {sharpe_diff:.4f} & {hjd_diff:.4f} \\\\\n"
 
-    # Create LaTeX table
-    latex_table = """\\begin{table}[h]
-\\centering
-"""
-    latex_table += table.to_latex(float_format="%.3f")
-    latex_table += f"""
-\\caption{{
-    \\textbf{{Performance of FMR and FFC Models.}}
-    {n_panels} panels of data are generated for the BGN economy.  The conditional Sharpe
-    ratio and $(\\hat y_{{t+1}}-z_{{t+1}})^2$ are calculated for each out-of-sample month for the FMR and FFC models, and
-    the means are computed for each panel.  The $t$-statistics and $p$-values are
-    for the difference between the FMR and FFC panel means.
-    \\label{{tab:fama}}}}
-\\end{{table}}"""
+        latex_table += r"\midrule" + "\n"
+
+    latex_table += r"\bottomrule" + "\n"
+    latex_table += r"\end{tabular}" + "\n"
+    latex_table += "\n"
+    latex_table += r"\caption{" + "\n"
+    latex_table += r"    \textbf{Performance of FMR and FFC Models.}" + "\n"
+    latex_table += r"    The conditional Sharpe ratio and Hansen-Jagannathan distance" + "\n"
+    latex_table += r"    are calculated for each out-of-sample month and averaged across panels." + "\n"
+    latex_table += r"    \label{tab:fama}}" + "\n"
+    latex_table += r"\end{table}" + "\n"
 
     with open(output_path, "w") as f:
         f.write(latex_table)
 
-    print(f"  Saved to {output_path}")
+    print(f"    Saved to {output_path}")
 
 
-def create_dkkm_table(dkkm: pd.DataFrame, fmr: pd.DataFrame,
-                     output_path: str, n_panels: int = 300):
-    """Create DKKM comparison table."""
-    print("Creating DKKM comparison table...")
+def create_dkkm_table(dkkm_all: pd.DataFrame, fama_all: pd.DataFrame, output_path: str):
+    """Create DKKM comparison table for all models."""
+    print("  Creating DKKM comparison table...")
 
-    t_stats_sharpe = pd.DataFrame(
-        index=dkkm.kappa.unique(),
-        columns=dkkm.factors.unique(),
-        dtype=float
-    )
+    latex_table = r"\begin{table}[h]" + "\n"
+    latex_table += r"\centering" + "\n"
 
-    t_stats_hjd = pd.DataFrame(
-        index=dkkm.kappa.unique(),
-        columns=dkkm.factors.unique(),
-        dtype=float
-    )
+    for metric, metric_name in [('sharpe', 'Sharpe Ratio'), ('hjd', 'Hansen-Jagannathan Distance')]:
+        latex_table += r"\begin{subtable}{\textwidth}" + "\n"
+        latex_table += r"\centering" + "\n"
+        latex_table += f"\\caption{{{metric_name}}}\n"
+        latex_table += r"\begin{tabular}{llrrr}" + "\n"
+        latex_table += r"\toprule" + "\n"
+        latex_table += r"Model & $\kappa$ & 6 & 36 & 360 \\" + "\n"
+        latex_table += r"\midrule" + "\n"
 
-    # Fill DataFrames with t-stats
-    for kappa in t_stats_sharpe.index:
-        for factors in t_stats_sharpe.columns:
-            dkkm_sharpe = dkkm[(dkkm.kappa == kappa) & (dkkm.factors == factors)].sharpe.to_numpy()
-            t_stat_sharpe, _ = ttest_1samp(dkkm_sharpe - fmr.sharpe.to_numpy(), 0)
-            t_stats_sharpe.loc[kappa, factors] = t_stat_sharpe
+        for model in MODELS:
+            model_dkkm = dkkm_all[dkkm_all['model_type'] == model]
+            model_fama = fama_all[(fama_all['model_type'] == model) & (fama_all['method'] == 'fm')]
 
-            dkkm_hjd = dkkm[(dkkm.kappa == kappa) & (dkkm.factors == factors)].hjd.to_numpy()
-            t_stat_hjd, _ = ttest_1samp(dkkm_hjd - fmr.hjd.to_numpy(), 0)
-            t_stats_hjd.loc[kappa, factors] = t_stat_hjd
+            if len(model_dkkm) == 0 or len(model_fama) == 0:
+                continue
 
-    # Create LaTeX table
-    latex_table = """\\begin{table}[h]
-\\centering
-\\begin{subtable}{\\textwidth}
-\\centering
-\\caption{Sharpe Ratio}
-"""
-    latex_table += t_stats_sharpe.to_latex(float_format="%.2f")
-    latex_table += """\\end{subtable}
+            # Get baseline FMR value
+            fmr_value = model_fama[metric].mean()
 
-\\begin{subtable}{\\textwidth}
-\\centering
-\\caption{Hansen-Jagannathan Distance}
-"""
-    latex_table += t_stats_hjd.to_latex(float_format="%.2f")
-    latex_table += f"""\\end{{subtable}}
-\\caption{{
-    \\textbf{{Performance of the DKKM Model.}}
-    {n_panels} panels of data are generated for the BGN economy.  The conditional Sharpe
-    ratio and $(\\hat y_{{t+1}}-z_{{t+1}})^2$ are calculated for each out-of-sample month for the DKKM and FMR models, and
-    the means are computed for each panel.  The table reports $t$-statistics
-   for the difference between the DKKM and FMR panel means.
-    \\label{{tab:dkkm}}}}
-\\end{{table}}"""
+            # Get unique kappa values for this model
+            kappa_values = sorted(model_dkkm['kappa'].unique())
 
-    with open(output_path, "w") as f:
-        f.write(latex_table)
+            for kappa in kappa_values:
+                kappa_data = model_dkkm[model_dkkm['kappa'] == kappa]
+                row = [model.upper(), f"{kappa:.6f}"]
 
-    print(f"  Saved to {output_path}")
+                for nfeatures in DKKM_NFEATURES:
+                    nf_data = kappa_data[kappa_data['factors'] == nfeatures]
+                    if len(nf_data) > 0:
+                        # Mean difference from FMR
+                        dkkm_value = nf_data[metric].mean()
+                        diff = dkkm_value - fmr_value
+                        row.append(f"{diff:.4f}")
+                    else:
+                        row.append("--")
 
+                latex_table += " & ".join(row) + " \\\\\n"
 
-def create_kps_table(kps: pd.DataFrame, dkkm: pd.DataFrame, fmr: pd.DataFrame,
-                    output_path: str, n_panels: int = 300):
-    """Create KPS/IPCA comparison table."""
-    print("Creating KPS comparison table...")
+            latex_table += r"\midrule" + "\n"
 
-    t_stats_kps_dkkm = pd.DataFrame(
-        index=["vs DKKM", "vs FMR"],
-        columns=kps.factors.unique(),
-        dtype=float
-    )
+        latex_table += r"\bottomrule" + "\n"
+        latex_table += r"\end{tabular}" + "\n"
+        latex_table += r"\end{subtable}" + "\n"
+        latex_table += "\n"
 
-    t_stats_kps_dkkm_hjd = pd.DataFrame(
-        index=["vs DKKM", "vs FMR"],
-        columns=kps.factors.unique(),
-        dtype=float
-    )
-
-    # Fill DataFrames with t-stats
-    dkkm_subset = dkkm[(dkkm.kappa == 0.05) & (dkkm.factors == 360)].sharpe.to_numpy()
-    fm_sharpe = fmr.sharpe.to_numpy()
-
-    for factors in t_stats_kps_dkkm.columns:
-        kps_subset = kps[kps.factors == factors].sharpe.to_numpy()
-
-        t_stat, _ = ttest_1samp(kps_subset - dkkm_subset, 0)
-        t_stats_kps_dkkm.loc["vs DKKM", factors] = t_stat
-
-        t_stat, _ = ttest_1samp(kps_subset - fm_sharpe, 0)
-        t_stats_kps_dkkm.loc["vs FMR", factors] = t_stat
-
-    # HJD t-stats
-    dkkm_subset = dkkm[(dkkm.kappa == 0.05) & (dkkm.factors == 360)].hjd.to_numpy()
-    fm_hjd = fmr.hjd.to_numpy()
-
-    for factors in t_stats_kps_dkkm_hjd.columns:
-        kps_subset = kps[kps.factors == factors].hjd.to_numpy()
-
-        t_stat, _ = ttest_1samp(kps_subset - dkkm_subset, 0)
-        t_stats_kps_dkkm_hjd.loc["vs DKKM", factors] = t_stat
-
-        t_stat, _ = ttest_1samp(kps_subset - fm_hjd, 0)
-        t_stats_kps_dkkm_hjd.loc["vs FMR", factors] = t_stat
-
-    # Create LaTeX table
-    latex_table = """\\begin{table}[h]
-\\centering
-\\begin{subtable}{\\textwidth}
-\\centering
-\\caption{Sharpe Ratio}
-"""
-    latex_table += t_stats_kps_dkkm.to_latex(float_format="%.2f")
-    latex_table += """\\end{subtable}
-
-\\begin{subtable}{\\textwidth}
-\\centering
-\\caption{Hansen-Jagannathan Distance}
-"""
-    latex_table += t_stats_kps_dkkm_hjd.to_latex(float_format="%.2f")
-    latex_table += f"""\\end{{subtable}}
-\\caption{{
-    \\textbf{{Performance of the KPS Model.}}
-    {n_panels} panels of data are generated for the BGN economy.  The
-    conditional Sharpe
-    ratio and $(\\hat y_{{t+1}}-z_{{t+1}})^2$ are calculated for each out-of-sample month for the DKKM, FMR, and KPS models, and
-    the means are computed for each panel.  The table reports $t$-statistics
-   for the difference in panel means of the KPS model compared to the DKKM model with 360 factors
-   and $\\kappa=0.05$ and the
-    KPS model compared to the FMR model.
-    \\label{{tab:kps}}}}
-\\end{{table}}"""
+    latex_table += r"\caption{" + "\n"
+    latex_table += r"    \textbf{Performance of the DKKM Model.}" + "\n"
+    latex_table += r"    Values show differences from FMR baseline (DKKM - FMR)." + "\n"
+    latex_table += r"    Results averaged across panels." + "\n"
+    latex_table += r"    \label{tab:dkkm}}" + "\n"
+    latex_table += r"\end{table}" + "\n"
 
     with open(output_path, "w") as f:
         f.write(latex_table)
 
-    print(f"  Saved to {output_path}")
+    print(f"    Saved to {output_path}")
 
 
 def main():
     """Main analysis function."""
     print("="*70)
-    print("NoIPCA ANALYSIS")
+    print("NOIPCA ANALYSIS")
     print("="*70)
     print()
 
@@ -578,126 +347,99 @@ def main():
     print(f"  Data directory: {DATA_DIR}")
     print()
 
-    # Configuration
-    model = 'bgn'
-    n_panels = 1  # Start with 1 panel for testing, increase to 300 for full analysis
-    nfeatures_list = [6, 36, 360]
+    # Discover all panels for each model
+    print("Discovering panels...")
+    all_panels = {}
+    for model in MODELS:
+        panels = discover_panels(model)
+        all_panels[model] = panels
+        print(f"  {model.upper()}: {len(panels)} panel(s) - {panels}")
+    print()
 
-    # Load results
-    print("Loading data...")
-    results = load_results(DATA_DIR, model=model, n_panels=n_panels,
-                          nfeatures_list=nfeatures_list)
+    # Load all results
+    print("Loading results...")
+    fama_all = []
+    dkkm_all = []
+    ipca_all = []
 
-    fama = results['fama']
-    dkkm = results['dkkm']
+    for model in MODELS:
+        if not all_panels[model]:
+            print(f"  {model.upper()}: No panels found, skipping")
+            continue
 
-    if len(fama) == 0:
-        print("ERROR: No Fama results found. Make sure you have run the workflow first:")
-        print(f"  python main.py {model} 0")
-        return
+        print(f"  {model.upper()}:")
 
-    if len(dkkm) == 0:
-        print("ERROR: No DKKM results found. Make sure you have run the workflow first:")
-        print(f"  python main.py {model} 0")
-        return
+        # Load Fama
+        fama = load_fama_results(model, all_panels[model])
+        if len(fama) > 0:
+            print(f"    Fama: {len(fama)} observations from {fama['panel'].nunique()} panel(s)")
+            fama_all.append(fama)
+
+        # Load DKKM
+        dkkm = load_dkkm_results(model, all_panels[model])
+        if len(dkkm) > 0:
+            print(f"    DKKM: {len(dkkm)} observations from {dkkm['panel'].nunique()} panel(s)")
+            dkkm_all.append(dkkm)
+
+        # Load IPCA
+        ipca = load_ipca_results(model, all_panels[model])
+        if len(ipca) > 0:
+            print(f"    IPCA: {len(ipca)} observations from {ipca['panel'].nunique()} panel(s)")
+            ipca_all.append(ipca)
+
+    # Combine all models
+    fama_all = pd.concat(fama_all, ignore_index=True) if fama_all else pd.DataFrame()
+    dkkm_all = pd.concat(dkkm_all, ignore_index=True) if dkkm_all else pd.DataFrame()
+    ipca_all = pd.concat(ipca_all, ignore_index=True) if ipca_all else pd.DataFrame()
 
     print()
     print("Processing data...")
 
-    # Rename columns to match original notebook
-    fama = fama.rename(columns={"method": "model", "mean": "mn"})
-    dkkm = dkkm.rename(columns={"alpha": "kappa", "mean": "mn"})
+    if len(fama_all) > 0:
+        # Rename columns and calculate metrics
+        fama_all = fama_all.rename(columns={"mean": "mn"})
+        fama_all["sharpe"] = fama_all.mn / fama_all.stdev
 
-    # Calculate Sharpe ratios
-    fama["sharpe"] = fama.mn / fama.stdev
-    dkkm["sharpe"] = dkkm.mn / dkkm.stdev
+        # Filter to alpha=0 for Fama (no shrinkage)
+        if 'alpha' in fama_all.columns:
+            fama_all = fama_all[fama_all.alpha == 0].copy()
 
-    # Calculate HJD realized (squared difference)
-    # Note: hjd column should already exist in the data but may be NaN
-    # For now we'll use the existing column or set to 0
-    if 'hjd' not in fama.columns:
-        fama["hjd_realized"] = 0.0
-        fama["hjd"] = 0.0
-    else:
-        fama["hjd_realized"] = fama.hjd ** 2
+    if len(dkkm_all) > 0:
+        # Rename columns and calculate metrics
+        dkkm_all = dkkm_all.rename(columns={"alpha": "kappa", "mean": "mn"})
+        dkkm_all["sharpe"] = dkkm_all.mn / dkkm_all.stdev
 
-    if 'hjd' not in dkkm.columns:
-        dkkm["hjd_realized"] = 0.0
-        dkkm["hjd"] = 0.0
-    else:
-        dkkm["hjd_realized"] = dkkm.hjd ** 2
-
-    # Aggregate monthly data to panel-level statistics
-    # This matches the original notebook's approach
-    print("  Aggregating monthly data to panel level...")
-    fama = fama.groupby(["model", "panel", "alpha"])[["sharpe", "hjd_realized"]].mean().reset_index()
-    dkkm = dkkm.groupby(["kappa", "factors", "panel"])[["sharpe", "hjd_realized"]].mean().reset_index()
-
-    # Calculate HJD from realized values
-    fama["hjd"] = np.sqrt(fama.hjd_realized)
-    dkkm["hjd"] = np.sqrt(dkkm.hjd_realized)
-
-    # Filter to alpha=0 for Fama methods (no shrinkage)
-    fama = fama[fama.alpha == 0].copy()
-    fama = fama.drop(columns=["alpha"])
-
-    # Split by method
-    ffc = fama[fama.model == "ff"].copy()
-    fmr = fama[fama.model == "fm"].copy()
-
-    print(f"  Fama-French results: {len(ffc)} panel observations")
-    print(f"  Fama-MacBeth results: {len(fmr)} panel observations")
-    print(f"  DKKM results: {len(dkkm)} panel observations")
+    # Create tables
     print()
+    print("Creating tables...")
+    if len(fama_all) > 0:
+        create_fama_table(fama_all, TABLES_DIR / "fama_comparisons.tex")
 
-    # For now, skip KPS analysis (not implemented yet)
-    # Create a dummy KPS dataframe for compatibility
-    kps = pd.DataFrame({
-        'factors': [1, 2, 3, 4, 5, 6],
-        'sharpe': [0.5, 0.6, 0.7, 0.75, 0.78, 0.8],
-        'hjd': [0.3, 0.25, 0.2, 0.18, 0.17, 0.16],
-        'panel': [0] * 6
-    })
+    if len(dkkm_all) > 0 and len(fama_all) > 0:
+        create_dkkm_table(dkkm_all, fama_all, TABLES_DIR / "dkkm_comparisons.tex")
 
-    try:
-        # Create figures only if we have enough data
-        if len(ffc) > 0 and len(fmr) > 0:
-            print("Creating figures...")
+    # Create figures
+    print()
+    print("Creating figures...")
+    for model in MODELS:
+        model_dkkm = dkkm_all[dkkm_all['model_type'] == model] if len(dkkm_all) > 0 else pd.DataFrame()
+        model_fama = fama_all[fama_all['model_type'] == model] if len(fama_all) > 0 else pd.DataFrame()
 
-            if len(dkkm) > 0:
-                print("  Creating DKKM Sharpe figure...")
-                create_dkkm_sharpe_figure(dkkm, FIGURES_DIR / "dkkm_sharpe.pdf")
+        if len(model_dkkm) > 0 and len(model_fama) > 0:
+            ffc = model_fama[model_fama['method'] == 'ff'].copy()
+            fmr = model_fama[model_fama['method'] == 'fm'].copy()
 
-            # Commented out until we have proper data
-            # create_means_figure(dkkm, kps, ffc, fmr, FIGURES_DIR / "means.pdf")
-            # create_kps_sharpe_figure(dkkm, kps, ffc, fmr, FIGURES_DIR / "kps_sharpe.pdf")
-            # create_densities_figure(dkkm, kps, fmr, FIGURES_DIR / "densities.pdf")
-
-        # Create tables only if we have enough data
-        if len(ffc) > 0 and len(fmr) > 0:
-            print("Creating tables...")
-            print("  Creating Fama comparison table...")
-            create_fama_table(ffc, fmr, TABLES_DIR / "fama_comparisons.tex", n_panels=n_panels)
-
-            if len(dkkm) > 0:
-                print("  Creating DKKM comparison table...")
-                create_dkkm_table(dkkm, fmr, TABLES_DIR / "dkkm_comparisons.tex", n_panels=n_panels)
-
-            # Commented out until we have KPS implementation
-            # create_kps_table(kps, dkkm, fmr, TABLES_DIR / "kps_comparisons.tex", n_panels=n_panels)
-
-    except Exception as e:
-        print(f"ERROR: {e}")
-        import traceback
-        traceback.print_exc()
+            if len(ffc) > 0 and len(fmr) > 0:
+                create_dkkm_figure(model_dkkm, ffc, fmr,
+                                 FIGURES_DIR / f"dkkm_{model}.pdf", model=model)
 
     print()
     print("="*70)
     print("ANALYSIS COMPLETE")
     print("="*70)
     print()
-    print("Note: To run full analysis with 300 panels, change n_panels=300 in the script")
-    print("Note: KPS/IPCA analysis not yet implemented - requires separate IPCA runs")
+    print(f"Tables: {TABLES_DIR}/")
+    print(f"Figures: {FIGURES_DIR}/")
 
 
 if __name__ == "__main__":
