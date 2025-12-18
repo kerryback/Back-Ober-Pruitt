@@ -6,6 +6,7 @@ Runs the complete workflow for a range of panel identifiers:
 2. Calculate SDF moments
 3. Compute Fama factors
 4. Compute DKKM factors for multiple feature counts
+5. Compute IPCA factors for multiple K values
 
 Usage:
     python main.py [model] [start] [end]
@@ -31,7 +32,7 @@ import os
 import subprocess
 import time
 from datetime import datetime
-from config import DATA_DIR, N_DKKM_FEATURES_LIST
+from config import DATA_DIR, N_DKKM_FEATURES_LIST, IPCA_K_VALUES
 
 
 def run_script(script_name, args, description):
@@ -97,9 +98,19 @@ def run_workflow_for_index(model, panel_id):
             f"STEP 4.{i}: Computing DKKM factors (nfeatures={nfeatures})"
         )
 
+    # Step 5: Compute IPCA factors for each K value
+    timings['run_ipca'] = {}
+    for i, K in enumerate(IPCA_K_VALUES, 1):
+        timings['run_ipca'][K] = run_script(
+            "run_ipca.py",
+            [full_panel_id, str(K)],
+            f"STEP 5.{i}: Computing IPCA factors (K={K})"
+        )
+
     # Print summary for this index
     total_time = sum([timings['generate_panel'], timings['calculate_moments'], timings['run_fama']] +
-                     list(timings['run_dkkm'].values()))
+                     list(timings['run_dkkm'].values()) +
+                     list(timings['run_ipca'].values()))
 
     print(f"\n{'='*70}")
     print(f"WORKFLOW COMPLETE FOR {full_panel_id.upper()}")
@@ -111,6 +122,9 @@ def run_workflow_for_index(model, panel_id):
     for i, nfeatures in enumerate(N_DKKM_FEATURES_LIST, 1):
         dkkm_time = timings['run_dkkm'][nfeatures]
         print(f"  4.{i} DKKM (n={nfeatures:4d}):      {dkkm_time:7.1f}s ({dkkm_time/60:5.1f}min)")
+    for i, K in enumerate(IPCA_K_VALUES, 1):
+        ipca_time = timings['run_ipca'][K]
+        print(f"  5.{i} IPCA (K={K}):          {ipca_time:7.1f}s ({ipca_time/60:5.1f}min)")
     print(f"  {'-'*50}")
     print(f"  Total for {full_panel_id}:  {total_time:7.1f}s ({total_time/60:5.1f}min)")
     print(f"{'='*70}\n")
@@ -181,6 +195,7 @@ def main():
         print(f"  Index range: {start} to {end-1} (inclusive)")
         print(f"  Total runs: {end - start}")
         print(f"  DKKM features: {N_DKKM_FEATURES_LIST}")
+        print(f"  IPCA K values: {IPCA_K_VALUES}")
         print(f"  Log file: {log_file}")
         print()
 
@@ -211,6 +226,8 @@ def main():
             print(f"    - Fama factors: {full_panel_id}_fama.pkl")
             for nfeatures in N_DKKM_FEATURES_LIST:
                 print(f"    - DKKM (n={nfeatures}): {full_panel_id}_dkkm_{nfeatures}.pkl")
+            for K in IPCA_K_VALUES:
+                print(f"    - IPCA (K={K}): {full_panel_id}_ipca_{K}.pkl")
         print()
         print(f"Log file: {log_file}")
         print(f"{'='*70}")
