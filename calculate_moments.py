@@ -33,20 +33,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import DATA_DIR
 
 
-def compute_month_moments(sdf_loop, month, burnin):
+def compute_month_moments(sdf_loop, month):
     """
     Compute SDF moments for a single month.
 
     Args:
         sdf_loop: SDF computation function
-        month: Month number
-        burnin: Burnin period
+        month: Month number (arrays are indexed 0 to T+burnin-1, matching month numbers)
 
     Returns:
         Tuple of (month, moments_dict)
     """
-    month_idx = month - burnin
-    sdf_ret, max_sr, rp, cond_var = sdf_loop(month_idx, 0)
+    # Call sdf_loop with month-1 to compute statistics at time month
+    # (sdf_loop(t) computes returns from time t to t+1, using data at t+1)
+    sdf_ret, max_sr, rp, cond_var = sdf_loop(month - 1, 0)
 
     # Compute second moment matrix and its inverse
     rp_vec = rp.reshape(-1, 1)
@@ -138,8 +138,8 @@ def main():
     sdf_loop = sdf_module.sdf_compute(N, T + burnin, arr_tuple)
 
     # Compute SDF outputs for months that will be used in portfolio stats
-    # Portfolio stats use months >= 361 (needs 360 months of history)
-    start_month = 361
+    # Portfolio stats use months >= burnin + 360 (needs 360 months of history)
+    start_month = burnin + 360
     end_month = T + burnin - 1  # Last available month
 
     n_months = end_month - start_month + 1
@@ -169,7 +169,7 @@ def main():
         # This prevents memory accumulation across chunks
         with Parallel(n_jobs=10, verbose=5) as parallel:
             chunk_results = parallel(
-                delayed(compute_month_moments)(sdf_loop, month, burnin)
+                delayed(compute_month_moments)(sdf_loop, month)
                 for month in chunk_months
             )
 
