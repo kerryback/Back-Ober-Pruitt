@@ -20,7 +20,7 @@ from . import dkkm_functions as dkkm
 from .ridge_utils import ridge_regression_grid
 
 
-def load_precomputed_moments(panel_id: str) -> Tuple[Dict, int]:
+def load_precomputed_moments(panel_id: str) -> Tuple[Dict, int, int, int]:
     """
     Load pre-computed SDF conditional moments from pickle file.
 
@@ -28,7 +28,7 @@ def load_precomputed_moments(panel_id: str) -> Tuple[Dict, int]:
         panel_id: Panel identifier (e.g., 'kp14_0')
 
     Returns:
-        Tuple of (moments dict, N)
+        Tuple of (moments dict, N, start_month, end_month)
         moments dict has structure: {month: {'rp', 'cond_var', 'second_moment', 'second_moment_inv', ...}}
     """
     # Load the moments pickle file
@@ -45,8 +45,10 @@ def load_precomputed_moments(panel_id: str) -> Tuple[Dict, int]:
 
     moments = moments_data['moments']
     N = moments_data['N']
+    start_month = moments_data['start_month']
+    end_month = moments_data['end_month']
 
-    return moments, N
+    return moments, N, start_month, end_month
 
 
 def compute_model_portfolio_stats(
@@ -63,7 +65,7 @@ def compute_model_portfolio_stats(
     Args:
         model_premia: Dict with 'taylor' and 'proj' DataFrames of factor returns
         panel: Panel data (needed for returns)
-        start_month: First month to compute stats (must be >= 361 for 360-month history)
+        start_month: First month to compute stats (must be >= burnin + 360 for 360-month history)
         end_month: Last month to compute stats
 
     Returns:
@@ -78,9 +80,6 @@ def compute_model_portfolio_stats(
         factor_returns = model_premia[method]
 
         for month in range(start_month, end_month + 1):
-            if month < 361:
-                continue  # Need 360 months of history
-
             # Issue #1 fix: Use mve_data to find optimal portfolio of factors
             port_of_factors = fama.mve_data(factor_returns, month, alpha=0)
 
@@ -141,7 +140,7 @@ def compute_fama_portfolio_stats(
         panel_id: Panel identifier (e.g., 'kp14_0')
         model: Model name ('bgn', 'kp14', 'gs21')
         chars: List of characteristics
-        start_month: First month (must be >= 361)
+        start_month: First month (must be >= burnin + 360)
         end_month: Last month
         alpha_lst: List of ridge penalties to evaluate (default: [0])
         burnin: Burn-in period (default: 200)
@@ -153,7 +152,11 @@ def compute_fama_portfolio_stats(
         alpha_lst = [0]
 
     # Load pre-computed SDF moments
-    moments, N = load_precomputed_moments(panel_id)
+    moments, N, moments_start, moments_end = load_precomputed_moments(panel_id)
+
+    # Use moments range if it's more restrictive than provided range
+    start_month = max(start_month, moments_start)
+    end_month = min(end_month, moments_end)
 
     results_list = []
 
@@ -165,9 +168,6 @@ def compute_fama_portfolio_stats(
 
     for method_name, factor_returns in fama_methods.items():
         for month in range(start_month, end_month + 1):
-            if month < 361:
-                continue
-
             # Get pre-computed SDF outputs for this month
             if month not in moments:
                 raise KeyError(f"Month {month} not found in pre-computed moments")
@@ -259,7 +259,7 @@ def compute_dkkm_portfolio_stats(
         model: Model name ('bgn', 'kp14', 'gs21')
         W: Random feature matrix
         chars: List of characteristics
-        start_month: First month (must be >= 361)
+        start_month: First month (must be >= burnin + 360)
         end_month: Last month
         alpha_lst: List of ridge penalties (default: [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1])
         include_mkt: Whether market factor is included
@@ -274,14 +274,15 @@ def compute_dkkm_portfolio_stats(
         alpha_lst = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1]
 
     # Load pre-computed SDF moments
-    moments, N = load_precomputed_moments(panel_id)
+    moments, N, moments_start, moments_end = load_precomputed_moments(panel_id)
+
+    # Use moments range if it's more restrictive than provided range
+    start_month = max(start_month, moments_start)
+    end_month = min(end_month, moments_end)
 
     results_list = []
 
     for month in range(start_month, end_month + 1):
-        if month < 361:
-            continue
-
         # Get pre-computed SDF outputs for this month
         if month not in moments:
             raise KeyError(f"Month {month} not found in pre-computed moments")
@@ -379,7 +380,7 @@ def compute_ipca_portfolio_stats(
         model: Model name ('bgn', 'kp14', 'gs21')
         K: Number of latent factors
         chars: List of characteristics
-        start_month: First month (must be >= start+360+361 for IPCA)
+        start_month: First month (must be >= burnin + 360 for IPCA)
         end_month: Last month
         alpha_lst: List of ridge penalties (default: [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1])
         include_mkt: Whether to include market factor
@@ -393,14 +394,15 @@ def compute_ipca_portfolio_stats(
         alpha_lst = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1]
 
     # Load pre-computed SDF moments
-    moments, N = load_precomputed_moments(panel_id)
+    moments, N, moments_start, moments_end = load_precomputed_moments(panel_id)
+
+    # Use moments range if it's more restrictive than provided range
+    start_month = max(start_month, moments_start)
+    end_month = min(end_month, moments_end)
 
     results_list = []
 
     for month in range(start_month, end_month + 1):
-        if month < 361:
-            continue
-
         # Check if month is in IPCA returns
         if month not in ipca_returns.index:
             continue

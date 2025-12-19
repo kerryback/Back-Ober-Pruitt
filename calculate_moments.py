@@ -263,8 +263,8 @@ def main():
     print(f"      data = pickle.load(f)")
     print(f"  moments = data['moments']")
     print(f"  # Access specific month:")
-    print(f"  rp = moments[361]['rp']")
-    print(f"  cond_var = moments[361]['cond_var']")
+    print(f"  rp = moments[{start_month}]['rp']")
+    print(f"  cond_var = moments[{start_month}]['cond_var']")
     print(f"{'='*70}")
 
 
