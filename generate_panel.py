@@ -119,9 +119,8 @@ def main():
 
     # Count firm-months with zero book-to-market (after burnin period)
     if 'bm' in panel.columns:
-        # Panel has multi-index (month, firmid) after create_panel
-        # Filter for months >= burnin
-        panel_post_burnin = panel[panel.index.get_level_values('month') >= burnin]
+        # Filter for months >= burnin (month is a column, not index level)
+        panel_post_burnin = panel[panel['month'] >= burnin]
         zero_bm_count = (panel_post_burnin['bm'] == 0).sum()
         print(f"\nFirm-months with bm=0 (after burnin): {zero_bm_count:,}")
     else:
