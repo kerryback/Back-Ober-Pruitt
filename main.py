@@ -39,12 +39,9 @@ def run_script(script_name, args, description):
     """Run a Python script and handle errors. Returns elapsed time in seconds."""
     print(f"\n{'='*70}")
     print(f"{description}")
-    print(f"{'='*70}")
+    print(f"{'='*70}\n")
 
     cmd = [sys.executable, script_name] + args
-    print(f"Running: {' '.join(cmd)}")
-    print(f"Started at {datetime.now().strftime('%I:%M%p')}")
-
     start_time = time.time()
     result = subprocess.run(cmd, capture_output=False)
     elapsed = time.time() - start_time
@@ -53,7 +50,6 @@ def run_script(script_name, args, description):
         print(f"\n[ERROR] {script_name} failed with return code {result.returncode}")
         sys.exit(1)
 
-    print(f"[OK] Completed at {datetime.now().strftime('%I:%M%p')} (took {elapsed:.1f}s / {elapsed/60:.1f}min)")
     return elapsed
 
 
@@ -74,18 +70,6 @@ def run_workflow_for_index(model, panel_id):
         [model, str(panel_id)],
         f"STEP 1: Generating {model.upper()} panel data (index={panel_id})"
     )
-
-    # Read and print zero book equity count
-    arrays_file = os.path.join(DATA_DIR, f"{full_panel_id}_arrays.pkl")
-    if os.path.exists(arrays_file):
-        with open(arrays_file, 'rb') as f:
-            import pickle
-            arrays_data = pickle.load(f)
-            if 'zero_book_count' in arrays_data and arrays_data['zero_book_count'] is not None:
-                zero_count = arrays_data['zero_book_count']
-                total_firmmonths = arrays_data['N'] * arrays_data['T']
-                pct = 100 * zero_count / total_firmmonths if total_firmmonths > 0 else 0
-                print(f"\n[INFO] Firm-months with book=0: {zero_count:,} ({pct:.2f}% of {total_firmmonths:,} total firm-months)")
 
     # Step 2: Calculate SDF conditional moments
     timings['calculate_moments'] = run_script(
