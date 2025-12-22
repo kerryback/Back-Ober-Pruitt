@@ -117,16 +117,16 @@ def main():
     else:
         print("Warning: 'mve' column not found, skipping size calculation")
 
-    # Count firm-months with zero book equity (after burnin period)
-    if 'book' in panel.columns:
+    # Count firm-months with zero book-to-market (after burnin period)
+    if 'bm' in panel.columns:
         # Panel has multi-index (month, firmid) after create_panel
         # Filter for months >= burnin
         panel_post_burnin = panel[panel.index.get_level_values('month') >= burnin]
-        zero_book_count = (panel_post_burnin['book'] == 0).sum()
-        print(f"\nFirm-months with book=0 (after burnin): {zero_book_count:,}")
+        zero_bm_count = (panel_post_burnin['bm'] == 0).sum()
+        print(f"\nFirm-months with bm=0 (after burnin): {zero_bm_count:,}")
     else:
-        zero_book_count = None
-        print("\nWarning: 'book' column not found, cannot count zero book equity")
+        zero_bm_count = None
+        print("\nWarning: 'bm' column not found, cannot count zero book-to-market")
 
     # Save panel and arrays to data directory
     arrays_filename = os.path.join(DATA_DIR, f'{model_name}_{identifier}_arrays.pkl')
@@ -144,7 +144,7 @@ def main():
             'model': model_name,
             'chars': chars,
             'identifier': identifier,
-            'zero_book_count': zero_book_count,
+            'zero_bm_count': zero_bm_count,
             'burnin': burnin
         }, f)
 
