@@ -12,9 +12,9 @@ import os
 
 N = 1000  # Number of firms
 T = 720   # Number of time periods (excluding burnin)
-BGN_BURNIN = 200  # BGN burnin period
-KP14_BURNIN = 200  # KP14 burnin period
-GS21_BURNIN = 200  # GS21 burnin period
+BGN_BURNIN = 300  # BGN burnin period
+KP14_BURNIN = 300  # KP14 burnin period
+GS21_BURNIN = 300  # GS21 burnin period
 N_JOBS = 10  # Number of parallel jobs
 
 # =============================================================================

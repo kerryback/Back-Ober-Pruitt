@@ -226,6 +226,14 @@ def main():
                 all_timings[i] = run_workflow_for_index(model, i)
             except Exception as e:
                 failed_indices.append(i)
+
+                # Clean up moments file for failed panel (if it exists)
+                moments_file = os.path.join(DATA_DIR, f"{model}_{i}_moments.pkl")
+                if os.path.exists(moments_file):
+                    file_size = os.path.getsize(moments_file) / (1024**3)  # Size in GB
+                    os.remove(moments_file)
+                    print(f"\n[CLEANUP] Deleted moments file for failed panel ({file_size:.2f} GB): {moments_file}")
+
                 print(f"\n{'='*70}")
                 print(f"ERROR: Workflow failed for {model}_{i}")
                 print(f"{'='*70}")

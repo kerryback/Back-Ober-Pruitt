@@ -5,7 +5,15 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(del \".git\\index.lock\")",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(dir:*)",
+      "Bash(nul)",
+      "Bash(gh auth status:*)",
+      "Bash(gh repo create:*)",
+      "Bash(del nul)",
+      "Bash(git push:*)",
+      "Bash(findstr:*)",
+      "Bash(git reset:*)"
     ],
     "deny": [],
     "ask": []
