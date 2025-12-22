@@ -1,6 +1,6 @@
 # Back-Ober-Pruitt: Asset Pricing Factor Models
 
-A comprehensive Python framework for simulating asset pricing models and computing risk factors using multiple methodologies. This project implements three structural asset pricing models (BGN, KP14, GS21) and evaluates factor models using Fama-French, DKKM, and IPCA approaches.
+A comprehensive Python framework for simulating asset pricing models and computing risk factors using multiple methodologies. This project implements three structural asset pricing models (BGN, KP14, GS21) and evaluates factor models using Fama-French, Fama-MacBeth-Rosenberg, DKKM, and IPCA approaches.
 
 ## Table of Contents
 

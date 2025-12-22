@@ -1,1 +1,0 @@
-Files in this folder are created by generate_panel and are created and read by calculate_moments, run_fama, and run_dkkm.
