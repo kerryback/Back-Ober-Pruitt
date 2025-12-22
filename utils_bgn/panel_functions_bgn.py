@@ -253,7 +253,13 @@ def create_panel(N, T, arr_tuple):
     df["mom"] = df.groupby("firmid", group_keys=False).cumret.apply(
         lambda x: x.shift(2) / x.shift(13) - 1
     )
-    df["agr"] = df.groupby("firmid", group_keys=False).book.apply(lambda x: x.pct_change())
+    # Asset growth: set to 0 when previous book equity is zero or negative
+    df["agr"] = df.groupby("firmid", group_keys=False).book.apply(
+        lambda x: pd.Series(
+            np.where(x.shift(1) > 0, x.pct_change(), 0),
+            index=x.index
+        )
+    )
     df.index = df.index.swaplevel()
     df.sort_index(level=["month", "firmid"], inplace=True)
     df = df.drop(columns=["book", "cumret", "op_cash_flow"])  
