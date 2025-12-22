@@ -24,7 +24,7 @@ Examples:
     python main.py kp14 10 15    # Runs for indices 10, 11, 12, 13, 14
 
 Output:
-    All output is logged to: logs/log_{model}_{start}_{end}.txt
+    All output is logged to: logs/{model}_{start}_{end}.log
 """
 
 import sys
@@ -178,7 +178,7 @@ def main():
     logs_dir = os.path.join(script_dir, 'logs')
     os.makedirs(logs_dir, exist_ok=True)
 
-    log_file = os.path.join(logs_dir, f"log_{model}_{start}_{end}.txt")
+    log_file = os.path.join(logs_dir, f"{model}_{start}_{end}.log")
 
     # Redirect stdout and stderr to log file
     original_stdout = sys.stdout

@@ -5,7 +5,7 @@ Displays the structure, info, and preview of data in pickle files.
 
 Usage:
     python view_pickle.py <pickle_file>
-    python view_pickle.py outputs/bgn_0_arrays.pkl
+    python view_pickle.py outputs/bgn_0_panel.pkl
     python view_pickle.py outputs/bgn_0_moments.pkl
 """
 
@@ -197,7 +197,7 @@ def main():
         print("Usage: python view_pickle.py <pickle_file>")
         print()
         print("Examples:")
-        print("  python view_pickle.py outputs/bgn_0_arrays.pkl")
+        print("  python view_pickle.py outputs/bgn_0_panel.pkl")
         print("  python view_pickle.py outputs/kp14_0_moments.pkl")
         print("  python view_pickle.py outputs/bgn_0_fama.pkl")
         print("  python view_pickle.py outputs/bgn_0_dkkm_360.pkl")
