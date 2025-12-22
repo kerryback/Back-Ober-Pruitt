@@ -13,5 +13,5 @@ joblib>=1.1.0
 # Requires Riemannian optimization on Stiefel manifold
 pymanopt>=2.2.0
 
-# Optional: Numba acceleration
-# numba>=0.56.0
+# JIT compilation for performance acceleration
+numba>=0.56.0
