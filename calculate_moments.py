@@ -10,7 +10,7 @@ Usage:
 
 Arguments:
     panel_id: Panel identifier (e.g., "bgn_0", "kp14_0", "gs21_5")
-              Reads from {panel_id}_arrays.pkl
+              Reads from {panel_id}_panel.pkl
               Output: {panel_id}_moments.pkl
 
 Examples:
@@ -96,16 +96,16 @@ def main():
     print(f"Started at {datetime.now().strftime('%a %d %b %Y, %I:%M%p')}")
     print("="*70)
 
-    # Load arrays data
-    arrays_path = os.path.join(DATA_DIR, f"{panel_id}_arrays.pkl")
+    # Load panel data
+    panel_path = os.path.join(DATA_DIR, f"{panel_id}_panel.pkl")
 
-    if not os.path.exists(arrays_path):
-        print(f"ERROR: Arrays file not found at: {arrays_path}")
-        print(f"\nPlease run generate_panel_{model_name}.py first to create the arrays file.")
+    if not os.path.exists(panel_path):
+        print(f"ERROR: Panel file not found at: {panel_path}")
+        print(f"\nPlease run generate_panel.py first to create the panel file.")
         sys.exit(1)
 
-    print(f"\nLoading arrays from {arrays_path}...")
-    with open(arrays_path, 'rb') as f:
+    print(f"\nLoading panel from {panel_path}...")
+    with open(panel_path, 'rb') as f:
         arrays_data = pickle.load(f)
 
     arr_tuple = arrays_data['arr_tuple']

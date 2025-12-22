@@ -251,7 +251,7 @@ def main():
             else:
                 full_panel_id = f"{model}_{i}"
                 print(f"\n  Index {i} ({full_panel_id}):")
-                print(f"    - Panel data: {full_panel_id}_arrays.pkl")
+                print(f"    - Panel data: {full_panel_id}_panel.pkl")
                 print(f"    - SDF moments: {full_panel_id}_moments.pkl (deleted after use)")
                 print(f"    - Fama factors: {full_panel_id}_fama.pkl")
                 for nfeatures in N_DKKM_FEATURES_LIST:

@@ -129,13 +129,13 @@ def main():
         print("\nWarning: 'bm' column not found, cannot count zero book-to-market")
 
     # Save panel and arrays to data directory
-    arrays_filename = os.path.join(DATA_DIR, f'{model_name}_{identifier}_arrays.pkl')
+    panel_filename = os.path.join(DATA_DIR, f'{model_name}_{identifier}_panel.pkl')
 
     print(f"\n{'-'*70}")
-    print(f"Saving panel and arrays to {arrays_filename}...")
+    print(f"Saving panel and arrays to {panel_filename}...")
     print(f"{'-'*70}")
 
-    with open(arrays_filename, 'wb') as f:
+    with open(panel_filename, 'wb') as f:
         pickle.dump({
             'panel': panel,
             'arr_tuple': arr_tuple,
@@ -173,7 +173,7 @@ def main():
     print(f"{'='*70}")
     print(f"Finished at {datetime.now().strftime('%a %d %b %Y, %I:%M%p')}")
     print(f"Total runtime: {elapsed_time:.1f}s ({elapsed_time/60:.1f} minutes)")
-    print(f"\nOutput file: {arrays_filename}")
+    print(f"\nOutput file: {panel_filename}")
     print(f"\nTo compute SDF moments:")
     print(f"  python calculate_moments.py {model_name}_{identifier}")
     print(f"\nTo extract factors:")

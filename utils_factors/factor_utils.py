@@ -114,18 +114,18 @@ def load_panel_data(panel_id: str, model_name: str) -> Tuple[pd.DataFrame, Dict[
     Raises:
         SystemExit: If file not found
     """
-    arrays_path = os.path.join(DATA_DIR, f"{panel_id}_arrays.pkl")
+    panel_path = os.path.join(DATA_DIR, f"{panel_id}_panel.pkl")
 
-    if not os.path.exists(arrays_path):
-        print(f"ERROR: Arrays file not found at: {arrays_path}")
-        print(f"\nPlease run generate_panel_{model_name}.py to create the arrays file.")
+    if not os.path.exists(panel_path):
+        print(f"ERROR: Panel file not found at: {panel_path}")
+        print(f"\nPlease run generate_panel.py to create the panel file.")
         print(f"\nUsage examples:")
         print(f"  python run_fama.py {panel_id}")
         print(f"  python run_dkkm.py {panel_id} [nfeatures]")
         sys.exit(1)
 
-    print(f"\nLoading panel from {arrays_path}...")
-    with open(arrays_path, 'rb') as f:
+    print(f"\nLoading panel from {panel_path}...")
+    with open(panel_path, 'rb') as f:
         arrays_data = pickle.load(f)
 
     panel = arrays_data['panel']

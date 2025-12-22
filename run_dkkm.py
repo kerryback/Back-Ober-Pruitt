@@ -8,7 +8,7 @@ Usage:
 
 Arguments:
     panel_id: Identifier for panel data (e.g., "bgn_0", "kp14_5")
-              Reads from {panel_id}_arrays.pkl
+              Reads from {panel_id}_panel.pkl
     nfeatures: Number of DKKM RFF features (e.g., 6, 36, 360)
 
 Output:
