@@ -107,6 +107,13 @@ def run_workflow_for_index(model, panel_id):
             f"STEP 5.{i}: Computing IPCA factors (K={K})"
         )
 
+    # Step 6: Clean up moments file to save disk space
+    moments_file = os.path.join(DATA_DIR, f"{full_panel_id}_moments.pkl")
+    if os.path.exists(moments_file):
+        file_size = os.path.getsize(moments_file) / (1024**3)  # Size in GB
+        os.remove(moments_file)
+        print(f"\n[CLEANUP] Deleted moments file ({file_size:.2f} GB): {moments_file}")
+
     # Print summary for this index
     total_time = sum([timings['generate_panel'], timings['calculate_moments'], timings['run_fama']] +
                      list(timings['run_dkkm'].values()) +
@@ -222,7 +229,7 @@ def main():
             full_panel_id = f"{model}_{i}"
             print(f"\n  Index {i} ({full_panel_id}):")
             print(f"    - Panel data: {full_panel_id}_arrays.pkl")
-            print(f"    - SDF moments: {full_panel_id}_moments.pkl")
+            print(f"    - SDF moments: {full_panel_id}_moments.pkl (deleted after use)")
             print(f"    - Fama factors: {full_panel_id}_fama.pkl")
             for nfeatures in N_DKKM_FEATURES_LIST:
                 print(f"    - DKKM (n={nfeatures}): {full_panel_id}_dkkm_{nfeatures}.pkl")
