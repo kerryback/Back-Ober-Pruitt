@@ -75,6 +75,18 @@ def run_workflow_for_index(model, panel_id):
         f"STEP 1: Generating {model.upper()} panel data (index={panel_id})"
     )
 
+    # Read and print zero book equity count
+    arrays_file = os.path.join(DATA_DIR, f"{full_panel_id}_arrays.pkl")
+    if os.path.exists(arrays_file):
+        with open(arrays_file, 'rb') as f:
+            import pickle
+            arrays_data = pickle.load(f)
+            if 'zero_book_count' in arrays_data and arrays_data['zero_book_count'] is not None:
+                zero_count = arrays_data['zero_book_count']
+                total_firmmonths = arrays_data['N'] * arrays_data['T']
+                pct = 100 * zero_count / total_firmmonths if total_firmmonths > 0 else 0
+                print(f"\n[INFO] Firm-months with book=0: {zero_count:,} ({pct:.2f}% of {total_firmmonths:,} total firm-months)")
+
     # Step 2: Calculate SDF conditional moments
     timings['calculate_moments'] = run_script(
         "calculate_moments.py",
@@ -208,8 +220,18 @@ def main():
 
         # Run workflow for each index in range
         all_timings = {}
+        failed_indices = []
         for i in range(start, end):
-            all_timings[i] = run_workflow_for_index(model, i)
+            try:
+                all_timings[i] = run_workflow_for_index(model, i)
+            except Exception as e:
+                failed_indices.append(i)
+                print(f"\n{'='*70}")
+                print(f"ERROR: Workflow failed for {model}_{i}")
+                print(f"{'='*70}")
+                print(f"Error: {str(e)}")
+                print(f"Continuing to next panel...")
+                print(f"{'='*70}\n")
 
         # Final summary
         overall_elapsed = time.time() - overall_start
@@ -221,20 +243,28 @@ def main():
         print()
         print(f"Summary for {model.upper()} indices {start} to {end-1}:")
         print(f"  Total runs: {end - start}")
+        print(f"  Successful: {len(all_timings)}")
+        print(f"  Failed: {len(failed_indices)}")
+        if failed_indices:
+            print(f"  Failed indices: {failed_indices}")
         print(f"  Total time: {overall_elapsed:7.1f}s ({overall_elapsed/60:5.1f}min)")
-        print(f"  Average time per run: {overall_elapsed/(end-start):7.1f}s ({overall_elapsed/(end-start)/60:5.1f}min)")
+        if all_timings:
+            print(f"  Average time per successful run: {overall_elapsed/len(all_timings):7.1f}s ({overall_elapsed/len(all_timings)/60:5.1f}min)")
         print()
         print(f"Output files created in: {DATA_DIR}")
         for i in range(start, end):
-            full_panel_id = f"{model}_{i}"
-            print(f"\n  Index {i} ({full_panel_id}):")
-            print(f"    - Panel data: {full_panel_id}_arrays.pkl")
-            print(f"    - SDF moments: {full_panel_id}_moments.pkl (deleted after use)")
-            print(f"    - Fama factors: {full_panel_id}_fama.pkl")
-            for nfeatures in N_DKKM_FEATURES_LIST:
-                print(f"    - DKKM (n={nfeatures}): {full_panel_id}_dkkm_{nfeatures}.pkl")
-            for K in IPCA_K_VALUES:
-                print(f"    - IPCA (K={K}): {full_panel_id}_ipca_{K}.pkl")
+            if i in failed_indices:
+                print(f"\n  Index {i} ({model}_{i}): FAILED - No output files")
+            else:
+                full_panel_id = f"{model}_{i}"
+                print(f"\n  Index {i} ({full_panel_id}):")
+                print(f"    - Panel data: {full_panel_id}_arrays.pkl")
+                print(f"    - SDF moments: {full_panel_id}_moments.pkl (deleted after use)")
+                print(f"    - Fama factors: {full_panel_id}_fama.pkl")
+                for nfeatures in N_DKKM_FEATURES_LIST:
+                    print(f"    - DKKM (n={nfeatures}): {full_panel_id}_dkkm_{nfeatures}.pkl")
+                for K in IPCA_K_VALUES:
+                    print(f"    - IPCA (K={K}): {full_panel_id}_ipca_{K}.pkl")
         print()
         print(f"Log file: {log_file}")
         print(f"{'='*70}")
@@ -251,6 +281,9 @@ def main():
     print(f"{'='*70}")
     print(f"Model: {model.upper()}")
     print(f"Indices: {start} to {end-1}")
+    print(f"Successful: {end - start - len(failed_indices)}/{end - start}")
+    if failed_indices:
+        print(f"Failed indices: {failed_indices}")
     print(f"Total time: {overall_elapsed:.1f}s ({overall_elapsed/60:.1f}min)")
     print(f"Log file: {log_file}")
     print(f"{'='*70}")
