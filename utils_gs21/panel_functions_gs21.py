@@ -265,8 +265,12 @@ def create_panel(N, T, arr_tuple):
     # roe = cash flow over beginning of month book equity
     # roe at date 0 = NAN
     # roe at date 1 = cash flow from 0 to 1 divided by date 0 book equity
+    # If book equity is zero or negative, set roe to 0
     df["roe"] = df.groupby("firmid", group_keys=False).apply(
-        lambda d: (d.op_cash_flow / d.book).shift()
+        lambda d: pd.Series(
+            np.where(d.book > 0, d.op_cash_flow / d.book, 0),
+            index=d.index
+        ).shift()
     )
     df["roe"] = (1 - df["default"])*df['roe'] # roe is 0 in first month of new firm
 
