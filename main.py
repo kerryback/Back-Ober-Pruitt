@@ -43,7 +43,8 @@ def run_script(script_name, args, description):
 
     cmd = [sys.executable, script_name] + args
     start_time = time.time()
-    result = subprocess.run(cmd, capture_output=False)
+    # Explicitly pass redirected stdout/stderr so subprocess output goes to log file
+    result = subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr)
     elapsed = time.time() - start_time
 
     if result.returncode != 0:
