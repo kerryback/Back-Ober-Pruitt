@@ -184,7 +184,7 @@ def main():
     original_stdout = sys.stdout
     original_stderr = sys.stderr
 
-    log_handle = open(log_file, 'w', encoding='utf-8')
+    log_handle = open(log_file, 'w', encoding='utf-8', buffering=1)
     sys.stdout = log_handle
     sys.stderr = log_handle
 
