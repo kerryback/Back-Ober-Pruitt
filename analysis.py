@@ -325,6 +325,152 @@ def create_dkkm_table(dkkm_all: pd.DataFrame, fama_all: pd.DataFrame, output_pat
     print(f"    Saved to {output_path}")
 
 
+def create_fama_boxplots(fama_all: pd.DataFrame, output_path: str):
+    """Create boxplots showing distribution of Fama metrics across panels."""
+    print("  Creating Fama boxplots...")
+
+    # Calculate panel-level means for each model-method combination
+    panel_means = fama_all.groupby(['model_type', 'method', 'panel']).agg({
+        'sharpe': 'mean',
+        'hjd': 'mean'
+    }).reset_index()
+
+    # Create figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Prepare data for boxplots
+    boxplot_data_sharpe = []
+    boxplot_data_hjd = []
+    labels = []
+
+    for model in MODELS:
+        model_data = panel_means[panel_means['model_type'] == model]
+        if len(model_data) == 0:
+            continue
+
+        for method, label in [('ff', 'FFC'), ('fm', 'FMR')]:
+            method_data = model_data[model_data['method'] == method]
+            if len(method_data) > 0:
+                boxplot_data_sharpe.append(method_data['sharpe'].values)
+                boxplot_data_hjd.append(method_data['hjd'].values)
+                labels.append(f"{model.upper()}\n{label}")
+
+    # Left panel: Sharpe ratios
+    bp1 = ax1.boxplot(boxplot_data_sharpe, labels=labels, patch_artist=True)
+    for patch in bp1['boxes']:
+        patch.set_facecolor('lightblue')
+    ax1.set_ylabel('Sharpe Ratio', fontsize=12)
+    ax1.set_title('(a) Sharpe Ratios - Distribution Across Panels')
+    ax1.grid(True, alpha=0.3, axis='y')
+    plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right')
+
+    # Right panel: HJ distances
+    bp2 = ax2.boxplot(boxplot_data_hjd, labels=labels, patch_artist=True)
+    for patch in bp2['boxes']:
+        patch.set_facecolor('lightcoral')
+    ax2.set_ylabel('Hansen-Jagannathan Distance', fontsize=12)
+    ax2.set_title('(b) HJ Distances - Distribution Across Panels')
+    ax2.grid(True, alpha=0.3, axis='y')
+    plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
+
+    plt.tight_layout()
+    plt.savefig(output_path, bbox_inches='tight')
+    print(f"    Saved to {output_path}")
+    plt.close()
+
+
+def create_dkkm_boxplots(dkkm_all: pd.DataFrame, output_path: str, model: str = 'bgn'):
+    """Create boxplots showing distribution of DKKM metrics across panels for a specific model."""
+    print(f"  Creating DKKM boxplots for {model.upper()}...")
+
+    # Filter for this model and kappa > 0
+    model_dkkm = dkkm_all[(dkkm_all['model_type'] == model) & (dkkm_all['kappa'] > 0)]
+
+    if len(model_dkkm) == 0:
+        print(f"    WARNING: No data for {model}")
+        return
+
+    # Calculate panel-level means
+    panel_means = model_dkkm.groupby(['kappa', 'factors', 'panel']).agg({
+        'sharpe': 'mean',
+        'hjd': 'mean'
+    }).reset_index()
+
+    # Get unique kappa and factor values
+    kappa_values = sorted(panel_means['kappa'].unique())
+
+    # Create figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+    # Prepare data for boxplots - organize by factors, with kappa as hue
+    for nfeatures in DKKM_NFEATURES:
+        factor_data = panel_means[panel_means['factors'] == nfeatures]
+
+        boxplot_data_sharpe = []
+        boxplot_data_hjd = []
+        positions_sharpe = []
+        positions_hjd = []
+        labels = []
+
+        base_pos = nfeatures
+        for i, kappa in enumerate(kappa_values):
+            kappa_data = factor_data[factor_data['kappa'] == kappa]
+            if len(kappa_data) > 0:
+                boxplot_data_sharpe.append(kappa_data['sharpe'].values)
+                boxplot_data_hjd.append(kappa_data['hjd'].values)
+                # Stagger positions based on kappa index
+                offset = (i - len(kappa_values)/2) * 0.15
+                positions_sharpe.append(base_pos + offset)
+                positions_hjd.append(base_pos + offset)
+                if nfeatures == DKKM_NFEATURES[0]:  # Only create labels once
+                    labels.append(f'$\\kappa$={kappa:.4g}')
+
+    # This approach is getting complex. Let's simplify by creating separate plots per metric
+    # and using seaborn for better categorical handling
+
+    # Alternative: create one figure per model showing all kappa-factor combinations
+    # Let's use a simpler approach: show boxplots for selected kappa values only
+
+    # Select a subset of kappa values to avoid overcrowding
+    selected_kappas = kappa_values[:4] if len(kappa_values) > 4 else kappa_values
+
+    boxplot_data_sharpe = []
+    boxplot_data_hjd = []
+    labels = []
+
+    for nfeatures in DKKM_NFEATURES:
+        for kappa in selected_kappas:
+            kappa_factor_data = panel_means[(panel_means['kappa'] == kappa) &
+                                           (panel_means['factors'] == nfeatures)]
+            if len(kappa_factor_data) > 0:
+                boxplot_data_sharpe.append(kappa_factor_data['sharpe'].values)
+                boxplot_data_hjd.append(kappa_factor_data['hjd'].values)
+                labels.append(f"$\\kappa$={kappa:.4g}\nn={nfeatures}")
+
+    # Left panel: Sharpe ratios
+    bp1 = ax1.boxplot(boxplot_data_sharpe, labels=labels, patch_artist=True)
+    for patch in bp1['boxes']:
+        patch.set_facecolor('lightblue')
+    ax1.set_ylabel('Sharpe Ratio', fontsize=12)
+    ax1.set_title(f'(a) DKKM Sharpe Ratios - {model.upper()}')
+    ax1.grid(True, alpha=0.3, axis='y')
+    plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=8)
+
+    # Right panel: HJ distances
+    bp2 = ax2.boxplot(boxplot_data_hjd, labels=labels, patch_artist=True)
+    for patch in bp2['boxes']:
+        patch.set_facecolor('lightcoral')
+    ax2.set_ylabel('Hansen-Jagannathan Distance', fontsize=12)
+    ax2.set_title(f'(b) DKKM HJ Distances - {model.upper()}')
+    ax2.grid(True, alpha=0.3, axis='y')
+    plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=8)
+
+    plt.tight_layout()
+    plt.savefig(output_path, bbox_inches='tight')
+    print(f"    Saved to {output_path}")
+    plt.close()
+
+
 def main():
     """Main analysis function."""
     print("="*70)
@@ -423,6 +569,17 @@ def main():
             if len(ffc) > 0 and len(fmr) > 0:
                 create_dkkm_figure(model_dkkm, ffc, fmr,
                                  FIGURES_DIR / f"dkkm_{model}.pdf", model=model)
+
+    # Create boxplots
+    print()
+    print("Creating boxplots...")
+    if len(fama_all) > 0:
+        create_fama_boxplots(fama_all, FIGURES_DIR / "fama_boxplots.pdf")
+
+    for model in MODELS:
+        model_dkkm = dkkm_all[dkkm_all['model_type'] == model] if len(dkkm_all) > 0 else pd.DataFrame()
+        if len(model_dkkm) > 0:
+            create_dkkm_boxplots(model_dkkm, FIGURES_DIR / f"dkkm_boxplots_{model}.pdf", model=model)
 
     print()
     print("="*70)
