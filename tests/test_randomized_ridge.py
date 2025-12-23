@@ -13,8 +13,8 @@ import os
 import numpy as np
 import time
 
-# Add current directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils_factors import ridge_utils
 
@@ -178,10 +178,10 @@ def test_small_scale():
 
     # Validate accuracy
     if results['comparison']['close']:
-        print("\n✓ Test PASSED: Randomized method matches standard method")
+        print("\n[PASS] Test PASSED: Randomized method matches standard method")
         return True
     else:
-        print("\n✗ Test FAILED: Randomized method differs from standard")
+        print("\n[FAIL] Test FAILED: Randomized method differs from standard")
         print(f"   Relative error: {results['comparison']['rel_error']:.6f}")
         return False
 
@@ -194,9 +194,9 @@ def main():
     # Check sklearn availability
     try:
         from sklearn.utils.extmath import randomized_svd
-        print("✓ scikit-learn available")
+        print("[OK] scikit-learn available")
     except ImportError:
-        print("✗ scikit-learn not available")
+        print("[ERROR] scikit-learn not available")
         print("  Install with: pip install scikit-learn")
         print("\nRandomized SVD requires scikit-learn.")
         print("Standard ridge regression will still work but will be very slow for large D.")

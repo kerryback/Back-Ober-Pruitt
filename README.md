@@ -38,10 +38,11 @@ Rather than running `main.py`, the five steps can be executed individually:
 ## Implementation Details
 
 1. IPCA is implemented using pymanopt rather than sequential least squares.  There is no parallelization.  The solution for each group of 360 months is used to initialize pymanopt for the next group.
-2. Randomized SVD is used for large numbers of DKKM factors (controlled by config.py parameters)
+2. Randomized SVD is used in ridge regression when the DKKM factors exceeds a threshold (controlled by config.py parameters)
 3. Some numba acceleration is used in `run_dkkm.py`
 4. `calculate_moments.py` processes months in chunks (controlled by config.py parameter) and writes each chunk to disk before proceeding to the next chunk. This is to conserve RAM.  Within each chunk, months are processed in parallel (controlled by n_jobs in config.py).  At the end of the script, the chunks are read and compiled into a single pickle file.  The intermediate pickle files are deleted.
 5.  If book value at $t-1$ is zero, then ROE and asset growth at $t$ are set to zero.  The number of firm/months with zero book value is computed for each panel and logged.  The default value of BURNIN was raised from 200 to 300 to reduce the frequency of zero book values.
+6.  Instead of computing multiple sets of DKKM factors for each number of factors (rank-standardized and non-rank-standardized, including market and not including market), parameters in config.py determine the type of factors computed.  The defaults are to rank-standardize and to include the market.
 
 ## Configuration
 
@@ -89,3 +90,33 @@ Each model has calibrated parameters (lines 85-159 in `config.py`):
 - **BGN**: Persistence (PI), interest rate volatility (SIGMA_R), etc.
 - **KP14**: Production parameters, default thresholds, risk aversion
 - **GS21**: Financing frictions, tax rates, issuance costs
+
+## Testing
+
+The `tests/` directory contains test files for validating the implementation. Currently, the test suite is in development:
+
+### Available Tests
+
+**test_randomized_ridge.py** - Validates randomized SVD ridge regression
+- Tests the approximation accuracy of randomized SVD vs standard eigendecomposition
+- Benchmarks performance for production-scale problems (D=10,000 features)
+- Verifies speedup and relative error for different problem sizes
+- Status: Requires updates to match current ridge_utils implementation
+
+**Placeholder test files** (currently empty):
+- `test_bgn_panel.py`, `test_kp14_panel.py`, `test_gs21_panel.py` - Panel generation tests
+- `test_bgn_moments.py`, `test_kp14_moments.py`, `test_gs21_moments.py` - SDF moment computation tests
+- `test_calculate_moments_workflow.py`, `test_calculate_moments_workflow_all.py` - Workflow tests for moment computation
+- `test_fama_workflow.py`, `test_fama_workflow_all.py` - Fama factor workflow tests
+- `test_dkkm_workflow.py` - DKKM factor workflow tests
+- `test_ipca_workflow.py` - IPCA factor workflow tests
+
+### Running Tests
+
+To run the randomized ridge regression test:
+```bash
+cd tests
+python test_randomized_ridge.py
+```
+
+**Note**: The test suite is currently being developed. Most test files are placeholders awaiting implementation.
