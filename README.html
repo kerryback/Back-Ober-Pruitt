@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.42">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>readme</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="README_files/libs/clipboard/clipboard.min.js"></script>
+<script src="README_files/libs/quarto-html/quarto.js"></script>
+<script src="README_files/libs/quarto-html/popper.min.js"></script>
+<script src="README_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="README_files/libs/quarto-html/anchor.min.js"></script>
+<link href="README_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="README_files/libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="README_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="README_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="README_files/libs/bootstrap/bootstrap-1bc8a17f135ab3d594c857e9f48e611b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+
+
+
+<section id="workflow" class="level2">
+<h2 class="anchored" data-anchor-id="workflow">Workflow</h2>
+<ol type="1">
+<li>Generate panel data: <code>generate_panel.py</code></li>
+<li>Calculate moments: <code>calculate_moments.py</code></li>
+<li>Compute Fama-French and Fama-MacBeth factors: <code>run_fama.py</code></li>
+<li>Compute DKKM factors (for all configured feature counts): <code>run_dkkm.py</code></li>
+<li>Compute IPCA factors (for all configured K values): <code>run_ipca.py</code></li>
+</ol>
+<p>Each step generates a dictionary saved as a pickle file in the <code>outputs</code> directory. The pickle files are read by subsequent steps.</p>
+<p>The <code>generate_panel.py</code> and <code>calculate_moments.py</code> are orchestration files for specialized <code>generate_panel_{model}.py</code> and <code>calculate_moments_{model}.py</code> scripts, where model is <code>bgn</code> or <code>kp14</code> or <code>gs21</code>.</p>
+<p>There are separate <code>utils</code> directories containing specialized scripts for the three models. There is also a <code>utils_factors</code> directory containing scripts used in <code>run_fama</code>, <code>run_dkkm</code>, and <code>run_ipca</code>.</p>
+<p>The outputs do not contain a panel index column. Instead, the panel index is expected to be saved as a part of filenames. Separate pickle files are generated for each panel.</p>
+<p>The entire workflow can be run for one or more panels of a model as</p>
+<pre><code>python main.py {model} {start_index} {end_index}</code></pre>
+<p>where the usual python convention of counting up to but not including <code>end_index</code> is followed. For example,</p>
+<pre><code>python main.py kp14 0 5
+``
+
+generates 5 kp14 panels, with filenames storing the indexes 0, 1, 2, 3, 4.
+
+
+
+```bash
+# Generate all outputs for KP14 model, indices 0-4
+python main.py kp14 0 5</code></pre>
+<p>This single command executes all 5 steps for each index: 1. Generate panel data 2. Calculate SDF moments 3. Compute Fama-French and Fama-MacBeth factors 4. Compute DKKM factors (for all configured feature counts) 5. Compute IPCA factors (for all configured K values)</p>
+<section id="individual-steps" class="level3">
+<h3 class="anchored" data-anchor-id="individual-steps">Individual Steps</h3>
+<p>You can also run each step independently:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Generate panel data</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> generate_panel.py kp14 0</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 2: Calculate SDF moments (expensive computation)</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> calculate_moments.py kp14_0</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 3: Fama-French factors</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> run_fama.py kp14_0</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 4: DKKM factors (specify number of features)</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> run_dkkm.py kp14_0 360</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 5: IPCA factors (specify number of latent factors K)</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> run_ipca.py kp14_0 3</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<hr>
+</section>
+<section id="architecture" class="level3">
+<h3 class="anchored" data-anchor-id="architecture">Architecture</h3>
+<p>The workflow follows a <strong>modular pipeline</strong>:</p>
+<pre><code>┌─────────────────────┐
+│  1. Generate Panel  │  &lt;- Simulate data from structural model
+│   (BGN/KP14/GS21)   │
+└──────────┬──────────┘
+           │ Output: {model}_{id}_arrays.pkl
+           ▼
+┌─────────────────────┐
+│ 2. Calculate SDF    │  &lt;- Compute true SDF moments         │
+└──────────┬──────────┘
+           │ Output: {model}_{id}_moments.pkl
+           ▼
+   ┌───────┴───────┬──────────────┐
+   │               │              │
+   ▼               ▼              ▼
+┌──────┐      ┌───────┐      ┌───────┐
+│ Fama │      │ DKKM  │      │ IPCA  │  &lt;- Estimate factors
+└───┬──┘      └───┬───┘      └───┬───┘
+    │             │              │
+    │             │              │
+    └─────────────┴──────────────┘
+                  │
+                  ▼ Output: {model}_{id}_{method}.pkl
+          ┌──────────────┐
+          │   Analysis   │  &lt;- Evaluate performance
+          │  (Optional)  │
+          └──────────────┘</code></pre>
+</section>
+<section id="step-details" class="level3">
+<h3 class="anchored" data-anchor-id="step-details">Step Details</h3>
+<section id="step-1-generate-panel-generate_panel.py" class="level4">
+<h4 class="anchored" data-anchor-id="step-1-generate-panel-generate_panel.py">Step 1: Generate Panel (<code>generate_panel.py</code>)</h4>
+<ul>
+<li><strong>Input</strong>: Model name (bgn/kp14/gs21), identifier</li>
+<li><strong>Process</strong>:
+<ul>
+<li>Solve model for firm value functions and SDFs</li>
+<li>Simulate firm dynamics (returns, book values, characteristics)</li>
+<li>Generate panel with N firms × T months</li>
+</ul></li>
+<li><strong>Output</strong>: <code>{model}_{id}_arrays.pkl</code> containing:
+<ul>
+<li><code>panel</code>: DataFrame with returns and characteristics</li>
+<li><code>A_*_taylor</code>, <code>A_*_proj</code>: True SDF loadings (Taylor vs projection)</li>
+<li><code>f_*_taylor</code>, <code>f_*_proj</code>: True factors</li>
+</ul></li>
+</ul>
+</section>
+<section id="step-2-calculate-moments-calculate_moments.py" class="level4">
+<h4 class="anchored" data-anchor-id="step-2-calculate-moments-calculate_moments.py">Step 2: Calculate Moments (<code>calculate_moments.py</code>)</h4>
+<ul>
+<li><strong>Input</strong>: Panel data from Step 1</li>
+<li><strong>Process</strong>:
+<ul>
+<li>Compute SDF conditional moments for each month</li>
+<li>Use <strong>parallel processing</strong> (joblib) for speed</li>
+<li>Process in chunks to manage memory (important for large panels)</li>
+</ul></li>
+<li><strong>Output</strong>: <code>{model}_{id}_moments.pkl</code> containing:
+<ul>
+<li><code>rp</code>: Risk premia (N × T)</li>
+<li><code>cond_var</code>: Conditional variance (N × T)</li>
+<li><code>second_moment</code>: E[mm’] (N × N × T)</li>
+<li><code>second_moment_inv</code>: [E[mm’]]^{-1} (N × N × T)</li>
+</ul></li>
+</ul>
+<p><strong>Why separate from factor computation?</strong> These moments are computationally expensive and reused across all factor methods, so we compute once and cache. Because storage of the inverse second moment matrices is expensive, the pickle file produced by calculate_moments is deleted in main.py after factor computation for a panel is finished.</p>
+</section>
+<section id="step-3-5-factor-computation" class="level4">
+<h4 class="anchored" data-anchor-id="step-3-5-factor-computation">Step 3-5: Factor Computation</h4>
+<p>Each method reads both <code>arrays.pkl</code> and <code>moments.pkl</code>, then: - Estimates factors using its methodology - Constructs portfolios with ridge regularization - Evaluates performance (Sharpe ratios, alphas, R²) - Saves results to <code>{model}_{id}_{method}.pkl</code></p>
+<hr>
+</section>
+</section>
+</section>
+<section id="configuration" class="level2">
+<h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
+<p>All parameters are centralized in <a href="config.py"><code>config.py</code></a>:</p>
+<section id="panel-dimensions" class="level3">
+<h3 class="anchored" data-anchor-id="panel-dimensions">Panel Dimensions</h3>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>N <span class="op">=</span> <span class="dv">1000</span>        <span class="co"># Number of firms</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>T <span class="op">=</span> <span class="dv">720</span>         <span class="co"># Time periods (months, excluding burnin)</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>BGN_BURNIN <span class="op">=</span> <span class="dv">300</span>   <span class="co"># Burnin period for BGN</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>KP14_BURNIN <span class="op">=</span> <span class="dv">300</span>  <span class="co"># Burnin period for KP14</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>GS21_BURNIN <span class="op">=</span> <span class="dv">300</span>  <span class="co"># Burnin period for GS21</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>N_JOBS <span class="op">=</span> <span class="dv">10</span>     <span class="co"># Parallel jobs for moment computation</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="dkkm-parameters" class="level3">
+<h3 class="anchored" data-anchor-id="dkkm-parameters">DKKM Parameters</h3>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>N_DKKM_FEATURES_LIST <span class="op">=</span> [<span class="dv">6</span>, <span class="dv">36</span>, <span class="dv">360</span>]  <span class="co"># RFF feature counts to test</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>DKKM_RANK_STANDARDIZE <span class="op">=</span> <span class="va">True</span>         <span class="co"># Rank-standardize characteristics</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>INCLUDE_MKT <span class="op">=</span> <span class="va">True</span>                   <span class="co"># Include market portfolio</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="ipca-parameters" class="level3">
+<h3 class="anchored" data-anchor-id="ipca-parameters">IPCA Parameters</h3>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>IPCA_K_VALUES <span class="op">=</span> [<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>]           <span class="co"># Number of latent factors</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>IPCA_N_RESTARTS <span class="op">=</span> <span class="dv">3</span>                 <span class="co"># Random restarts for robustness</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>IPCA_MAX_ITERATIONS <span class="op">=</span> <span class="dv">100</span>           <span class="co"># Max iterations for optimization</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>IPCA_SIGN_NORMALIZE <span class="op">=</span> <span class="va">True</span>          <span class="co"># Normalize factor signs</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>IPCA_WARM_START <span class="op">=</span> <span class="va">True</span>              <span class="co"># Use previous solution as initial guess</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="ridge-regularization" class="level3">
+<h3 class="anchored" data-anchor-id="ridge-regularization">Ridge Regularization</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Shrinkage penalties (Berk-Jameson regularization)</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>ALPHA_LST <span class="op">=</span> [<span class="dv">0</span>, <span class="fl">0.0001</span>, <span class="fl">0.001</span>, <span class="fl">0.01</span>, <span class="fl">0.05</span>, <span class="fl">0.1</span>, <span class="dv">1</span>]  <span class="co"># For BGN/KP14</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>ALPHA_LST_GS <span class="op">=</span> [<span class="dv">0</span>, <span class="fl">0.0000001</span>, ..., <span class="fl">0.1</span>, <span class="dv">1</span>]          <span class="co"># For GS21</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>IPCA_ALPHA_LST <span class="op">=</span> [<span class="dv">0</span>, <span class="fl">0.0001</span>, <span class="fl">0.001</span>, <span class="fl">0.01</span>, <span class="fl">0.05</span>, <span class="fl">0.1</span>, <span class="dv">1</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="model-parameters" class="level3">
+<h3 class="anchored" data-anchor-id="model-parameters">Model Parameters</h3>
+<p>Each model has calibrated parameters (lines 85-159 in <code>config.py</code>): - <strong>BGN</strong>: Persistence (PI), interest rate volatility (SIGMA_R), etc. - <strong>KP14</strong>: Production parameters, default thresholds, risk aversion - <strong>GS21</strong>: Financing frictions, tax rates, issuance costs</p>
+<hr>
+</section>
+</section>
+<section id="output-files" class="level2">
+<h2 class="anchored" data-anchor-id="output-files">Output Files</h2>
+<p>All outputs are saved to the <code>outputs/</code> directory:</p>
+<section id="generated-files-per-panel" class="level3">
+<h3 class="anchored" data-anchor-id="generated-files-per-panel">Generated Files (per panel)</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>File Pattern</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>{model}_{id}_arrays.pkl</code></td>
+<td>Panel data + true SDF loadings/factors</td>
+</tr>
+<tr class="even">
+<td><code>{model}_{id}_moments.pkl</code></td>
+<td>Cached SDF conditional moments</td>
+</tr>
+<tr class="odd">
+<td><code>{model}_{id}_fama.pkl</code></td>
+<td>Fama-French + Fama-MacBeth factors</td>
+</tr>
+<tr class="even">
+<td><code>{model}_{id}_dkkm_{nfeatures}.pkl</code></td>
+<td>DKKM factors with specified features</td>
+</tr>
+<tr class="odd">
+<td><code>{model}_{id}_ipca_{K}.pkl</code></td>
+<td>IPCA factors with K latent factors</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="pickle-file-contents" class="level3">
+<h3 class="anchored" data-anchor-id="pickle-file-contents">Pickle File Contents</h3>
+<p>Each factor output file contains:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">'factors'</span>: np.ndarray,           <span class="co"># Factor returns (T × K)</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">'loadings'</span>: np.ndarray,          <span class="co"># Factor loadings (N × K × T)</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">'stats'</span>: <span class="bu">dict</span>,                   <span class="co"># Performance statistics</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">'config'</span>: <span class="bu">dict</span>,                  <span class="co"># Configuration used</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">'panel_id'</span>: <span class="bu">str</span>,                 <span class="co"># Panel identifier</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="co"># ... method-specific fields</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="logs" class="level3">
+<h3 class="anchored" data-anchor-id="logs">Logs</h3>
+<p>All runs are logged to <code>logs/log_{model}_{start}_{end}.txt</code> with: - Execution times for each step - Configuration used - Convergence diagnostics (for IPCA) - Memory usage and performance metrics</p>
+<hr>
+</section>
+</section>
+<section id="project-structure" class="level2">
+<h2 class="anchored" data-anchor-id="project-structure">Project Structure</h2>
+<pre><code>Back-Ober-Pruitt/
+│
+├── main.py                    # Master workflow orchestrator
+├── generate_panel.py          # Step 1: Panel generation
+├── calculate_moments.py       # Step 2: SDF moments
+├── run_fama.py               # Step 3: Fama factors
+├── run_dkkm.py               # Step 4: DKKM factors
+├── run_ipca.py               # Step 5: IPCA factors
+├── config.py                 # Centralized configuration
+├── requirements.txt          # Python dependencies
+│
+├── utils_bgn/                # BGN model implementation
+│   ├── panel_functions_bgn.py    # Panel generation
+│   ├── sdf_compute_bgn.py        # SDF computation
+│   ├── loadings_compute_bgn.py   # True loadings
+│   └── vasicek.py                # Interest rate dynamics
+│
+├── utils_kp14/               # KP14 model implementation
+│   ├── panel_functions_kp14.py
+│   ├── sdf_compute_kp14.py
+│   └── loadings_compute_kp14.py
+│
+├── utils_gs21/               # GS21 model implementation
+│   ├── panel_functions_gs21.py
+│   ├── sdf_compute_gs21.py
+│   └── loadings_compute_gs21.py
+│
+├── utils_factors/            # Factor computation utilities
+│   ├── fama_functions.py         # Fama-French/MacBeth
+│   ├── dkkm_functions.py         # DKKM RFF implementation
+│   ├── ipca_functions.py         # IPCA estimation
+│   ├── portfolio_stats.py        # Performance evaluation
+│   ├── ridge_utils.py            # Ridge regression utilities
+│   └── factor_utils.py           # Common utilities
+│
+├── outputs/                  # Generated data files
+├── logs/                     # Execution logs
+├── tests/                    # Unit and workflow tests
+└── .claude/                  # Claude Code configuration</code></pre>
+<hr>
+</section>
+<section id="technical-details" class="level2">
+<h2 class="anchored" data-anchor-id="technical-details">Technical Details</h2>
+<section id="key-design-decisions" class="level3">
+<h3 class="anchored" data-anchor-id="key-design-decisions">Key Design Decisions</h3>
+<section id="roe-calculation-with-zero-book-equity" class="level4">
+<h4 class="anchored" data-anchor-id="roe-calculation-with-zero-book-equity">1. ROE Calculation with Zero Book Equity</h4>
+<p><strong>Issue</strong>: Firms with zero book equity cause <code>roe = NaN</code>, leading to data loss.</p>
+<p><strong>Solution</strong>: Set <code>roe = 0</code> when <code>book &lt;= 0</code>:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>df[<span class="st">"roe"</span>] <span class="op">=</span> df.groupby(<span class="st">"firmid"</span>, group_keys<span class="op">=</span><span class="va">False</span>).<span class="bu">apply</span>(</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">lambda</span> d: pd.Series(</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>        np.where(d.book <span class="op">&gt;</span> <span class="dv">0</span>, d.op_cash_flow <span class="op">/</span> d.book, <span class="dv">0</span>),</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>        index<span class="op">=</span>d.index</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    ).shift()</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Applied to all three models (BGN, KP14, GS21).</p>
+</section>
+<section id="parallel-processing-strategy" class="level4">
+<h4 class="anchored" data-anchor-id="parallel-processing-strategy">2. Parallel Processing Strategy</h4>
+<ul>
+<li><strong>Panel generation</strong>: Sequential (model solving requires state)</li>
+<li><strong>Moment computation</strong>: Parallel across months (<code>joblib</code> with <code>n_jobs=10</code>)</li>
+<li><strong>Factor computation</strong>: Sequential for each panel, but can run multiple panels in parallel</li>
+</ul>
+</section>
+<section id="memory-management" class="level4">
+<h4 class="anchored" data-anchor-id="memory-management">3. Memory Management</h4>
+<ul>
+<li><code>calculate_moments.py</code> processes in chunks (50 months at a time)</li>
+<li>Garbage collection (<code>gc.collect()</code>) between chunks</li>
+<li>Large arrays stored as <code>float64</code> only when necessary</li>
+</ul>
+</section>
+<section id="ipca-optimization" class="level4">
+<h4 class="anchored" data-anchor-id="ipca-optimization">4. IPCA Optimization</h4>
+<ul>
+<li>Uses <strong>Stiefel manifold optimization</strong> (pymanopt)</li>
+<li>Warm-start from previous window for speed</li>
+<li>Multiple random restarts for first window (robustness)</li>
+<li>Sign normalization for interpretability</li>
+</ul>
+<hr>
+</section>
+</section>
+</section>
+<section id="performance-considerations" class="level2">
+<h2 class="anchored" data-anchor-id="performance-considerations">Performance Considerations</h2>
+<section id="computational-costs-approximate-for-n1000-t720" class="level3">
+<h3 class="anchored" data-anchor-id="computational-costs-approximate-for-n1000-t720">Computational Costs (Approximate, for N=1000, T=720)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Step</th>
+<th>Time</th>
+<th>Bottleneck</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Generate Panel</td>
+<td>~5-10 min</td>
+<td>Model solving</td>
+</tr>
+<tr class="even">
+<td>Calculate Moments</td>
+<td>~30-60 min</td>
+<td>SDF evaluation (parallel)</td>
+</tr>
+<tr class="odd">
+<td>Fama Factors</td>
+<td>~2-5 min</td>
+<td>Portfolio formation</td>
+</tr>
+<tr class="even">
+<td>DKKM (360 features)</td>
+<td>~10-20 min</td>
+<td>Ridge regression</td>
+</tr>
+<tr class="odd">
+<td>IPCA (K=3)</td>
+<td>~15-30 min</td>
+<td>Stiefel optimization</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Total per panel</strong>: ~1-2 hours</p>
+</section>
+<section id="optimization-tips" class="level3">
+<h3 class="anchored" data-anchor-id="optimization-tips">Optimization Tips</h3>
+<ol type="1">
+<li><strong>Increase <code>N_JOBS</code></strong> if you have more cores (currently 10)</li>
+<li><strong>Use smaller panels</strong> for testing (e.g., N=100, T=400)</li>
+<li><strong>Run multiple panels in parallel</strong> using separate terminals</li>
+<li><strong>Enable numba</strong> (uncomment in <code>requirements.txt</code>) for ~2x speedup on ridge regression</li>
+</ol>
+<hr>
+</section>
+</section>
+<section id="example-usage-scenarios" class="level2">
+<h2 class="anchored" data-anchor-id="example-usage-scenarios">Example Usage Scenarios</h2>
+<section id="scenario-1-quick-test" class="level3">
+<h3 class="anchored" data-anchor-id="scenario-1-quick-test">Scenario 1: Quick Test</h3>
+<div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Small panel for testing</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Edit config.py: N = 100, T = 400</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> main.py kp14 0 1</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="scenario-2-single-model-multiple-realizations" class="level3">
+<h3 class="anchored" data-anchor-id="scenario-2-single-model-multiple-realizations">Scenario 2: Single Model, Multiple Realizations</h3>
+<div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Generate 10 independent panels for KP14</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> main.py kp14 0 10</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="scenario-3-compare-across-models" class="level3">
+<h3 class="anchored" data-anchor-id="scenario-3-compare-across-models">Scenario 3: Compare Across Models</h3>
+<div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run all three models with same identifier</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> main.py bgn 0 1</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> main.py kp14 0 1</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> main.py gs21 0 1</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="scenario-4-sensitivity-analysis" class="level3">
+<h3 class="anchored" data-anchor-id="scenario-4-sensitivity-analysis">Scenario 4: Sensitivity Analysis</h3>
+<div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Test different DKKM feature counts</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Edit config.py: N_DKKM_FEATURES_LIST = [10, 50, 100, 500, 1000]</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> main.py kp14 0 1</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="scenario-5-custom-factor-configuration" class="level3">
+<h3 class="anchored" data-anchor-id="scenario-5-custom-factor-configuration">Scenario 5: Custom Factor Configuration</h3>
+<div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run only specific factor methods</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> generate_panel.py kp14 0</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> calculate_moments.py kp14_0</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> run_ipca.py kp14_0 5  <span class="co"># Test K=5 latent factors</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<hr>
+</section>
+</section>
+<section id="requirements" class="level2">
+<h2 class="anchored" data-anchor-id="requirements">Requirements</h2>
+<p>See <a href="requirements.txt"><code>requirements.txt</code></a> for full list. Key dependencies:</p>
+<p>``` numpy&gt;=1.20.0 pandas&gt;=1.3.0 scipy&gt;=1.7.0 statsmodels&gt;=0.13.0 joblib&gt;=1.1.0 pymanopt&gt;=2.2.0 numba&gt;=0.56.0 - For accelerated ridge regression</p>
+<p><strong>Python Version</strong>: 3.8+</p>
+<hr>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

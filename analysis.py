@@ -163,13 +163,8 @@ def create_dkkm_figure(dkkm: pd.DataFrame, ffc: pd.DataFrame, fmr: pd.DataFrame,
     """Create DKKM figure with Sharpe and HJD panels."""
     print(f"  Creating DKKM figure for {model.upper()}...")
 
-    # Filter out kappa = 0 and apply model-specific range
-    if model == 'gs21':
-        lb, ub = 0.00001, 0.001
-    else:  # bgn or kp14
-        lb, ub = 0.01, 0.1
-
-    dkkm_filtered = dkkm[(dkkm['kappa'] >= lb) & (dkkm['kappa'] <= ub)].copy()
+    # Filter out kappa = 0 only
+    dkkm_filtered = dkkm[dkkm['kappa'] > 0].copy()
 
     if len(dkkm_filtered) == 0:
         print(f"    WARNING: No data after filtering for {model}")
@@ -292,9 +287,6 @@ def create_dkkm_table(dkkm_all: pd.DataFrame, fama_all: pd.DataFrame, output_pat
             if len(model_dkkm) == 0 or len(model_fama) == 0:
                 continue
 
-            # Get baseline FMR value
-            fmr_value = model_fama[metric].mean()
-
             # Get unique kappa values for this model
             kappa_values = sorted(model_dkkm['kappa'].unique())
 
@@ -305,10 +297,9 @@ def create_dkkm_table(dkkm_all: pd.DataFrame, fama_all: pd.DataFrame, output_pat
                 for nfeatures in DKKM_NFEATURES:
                     nf_data = kappa_data[kappa_data['factors'] == nfeatures]
                     if len(nf_data) > 0:
-                        # Mean difference from FMR
+                        # Mean raw value
                         dkkm_value = nf_data[metric].mean()
-                        diff = dkkm_value - fmr_value
-                        row.append(f"{diff:.4f}")
+                        row.append(f"{dkkm_value:.4f}")
                     else:
                         row.append("--")
 
@@ -323,7 +314,7 @@ def create_dkkm_table(dkkm_all: pd.DataFrame, fama_all: pd.DataFrame, output_pat
 
     latex_table += r"\caption{" + "\n"
     latex_table += r"    \textbf{Performance of the DKKM Model.}" + "\n"
-    latex_table += r"    Values show differences from FMR baseline (DKKM - FMR)." + "\n"
+    latex_table += r"    Values show raw Sharpe ratios and HJ distances." + "\n"
     latex_table += r"    Results averaged across panels." + "\n"
     latex_table += r"    \label{tab:dkkm}}" + "\n"
     latex_table += r"\end{table}" + "\n"

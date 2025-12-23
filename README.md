@@ -42,13 +42,14 @@ Rather than running `main.py`, the five steps can be executed individually:
 3. Some numba acceleration is used in `run_dkkm.py`
 4. `calculate_moments.py` processes months in chunks (controlled by config.py parameter) and writes each chunk to disk before proceeding to the next chunk. This is to conserve RAM.  Within each chunk, months are processed in parallel (controlled by n_jobs in config.py).  At the end of the script, the chunks are read and compiled into a single pickle file.  The intermediate pickle files are deleted.
 5.  If book value at $t-1$ is zero, then ROE and asset growth at $t$ are set to zero.  The number of firm/months with zero book value is computed for each panel and logged.  The default value of BURNIN was raised from 200 to 300 to reduce the frequency of zero book values.
-6.  Instead of computing multiple sets of DKKM factors for each number of factors (rank-standardized and non-rank-standardized, including market and not including market), parameters in config.py determine the type of factors computed.  The defaults are to rank-standardize and to include the market.
+6.  Parameters in config.py determine the type of factors computed (rank-standardized or non-rank-standardized, including market or not including market),  The defaults are to rank-standardize and to include the market.  This differs from the original code that calculated both rank-standardized and non-rank-standardized factors.
 
 ## Configuration
 
 All parameters are centralized in [`config.py`](config.py):
 
 ### Panel Dimensions
+
 ```python
 N = 1000        # Number of firms
 T = 720         # Time periods (months, excluding burnin)
@@ -59,6 +60,7 @@ N_JOBS = 10     # Parallel jobs for moment computation
 ```
 
 ### DKKM Parameters
+
 ```python
 N_DKKM_FEATURES_LIST = [6, 36, 360]  # RFF feature counts to test
 DKKM_RANK_STANDARDIZE = True         # Rank-standardize characteristics
@@ -66,6 +68,7 @@ INCLUDE_MKT = True                   # Include market portfolio
 ```
 
 ### IPCA Parameters
+
 ```python
 IPCA_K_VALUES = [1, 2, 3]           # Number of latent factors
 IPCA_N_RESTARTS = 3                 # Random restarts for robustness
@@ -75,48 +78,74 @@ IPCA_WARM_START = True              # Use previous solution as initial guess
 ```
 
 ### Ridge Parameters
+
 ```python
 # Shrinkage penalties (Berk-Jameson regularization)
 ALPHA_LST = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1]  # For BGN/KP14
 ALPHA_LST_GS = [0, 0.0000001, ..., 0.1, 1]          # For GS21
 IPCA_ALPHA_LST = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1]
 RIDGE_SVD_THRESHOLD = 1000  # Use randomized SVD when # factors > threshold
-RIDGE_SVD_RANK = 500  # Rank approximation for randomized SVD
+RIDGE_SVD_RANK = 500  # Rank approximation for randomized SVD (uses this many singular values)
 ```
 
 ### Model Parameters
 
-Each model has calibrated parameters (lines 85-159 in `config.py`):
-- **BGN**: Persistence (PI), interest rate volatility (SIGMA_R), etc.
-- **KP14**: Production parameters, default thresholds, risk aversion
-- **GS21**: Financing frictions, tax rates, issuance costs
+Each model has calibrated parameters (lines 85-159 in `config.py`).
 
 ## Testing
 
-The `tests/` directory contains test files for validating the implementation. Currently, the test suite is in development:
+The `tests/` directory contains test infrastructure and comparison utilities.
 
-### Available Tests
+### Code Organization Comparison
 
-**test_randomized_ridge.py** - Validates randomized SVD ridge regression
-- Tests the approximation accuracy of randomized SVD vs standard eigendecomposition
-- Benchmarks performance for production-scale problems (D=10,000 features)
-- Verifies speedup and relative error for different problem sizes
-- Status: Requires updates to match current ridge_utils implementation
+**Refactored code** (this directory):
+- Modular workflow: separate scripts for each step
+- Organized utilities: `utils_bgn/`, `utils_kp14/`, `utils_gs21/`, `utils_factors/`
+- Data in `data/` subdirectory
 
-**Placeholder test files** (currently empty):
-- `test_bgn_panel.py`, `test_kp14_panel.py`, `test_gs21_panel.py` - Panel generation tests
-- `test_bgn_moments.py`, `test_kp14_moments.py`, `test_gs21_moments.py` - SDF moment computation tests
-- `test_calculate_moments_workflow.py`, `test_calculate_moments_workflow_all.py` - Workflow tests for moment computation
-- `test_fama_workflow.py`, `test_fama_workflow_all.py` - Fama factor workflow tests
-- `test_dkkm_workflow.py` - DKKM factor workflow tests
-- `test_ipca_workflow.py` - IPCA factor workflow tests
+**Original code** (parent directory `../`):
+- Monolithic `main.py` orchestrating entire workflow
+- Flat structure: all function files in root directory
+- Data files (Jstar.csv, G_func.csv, etc.) in root
 
-### Running Tests
+### Test Utilities
 
-To run the randomized ridge regression test:
+The `tests/test_utils/` directory provides comparison tools for numerical validation:
+
+**comparison.py** - Functions for comparing outputs:
+```python
+assert_close(arr1, arr2, rtol=1e-10, atol=1e-12, name="")
+assert_dataframes_equal(df1, df2, rtol=1e-10, atol=1e-12)
+assert_factors_equal_up_to_sign(f1, f2, rtol=1e-8, atol=1e-10)  # For IPCA
+compute_summary_stats(data_dict, name="")
+print_comparison_summary(stats1, stats2)
+```
+
+**config_override.py** - Small test parameters:
+- N=50 firms (vs 1000 production)
+- T=400 periods (vs 720 production)
+- Burnin=100 (vs 300 production)
+- Fixed seed=12345 for reproducibility
+
+### Recommended Numerical Tolerances
+
+Different operations require different precision:
+- Panel generation: rtol=1e-14 (exact match expected)
+- Moments: rtol=1e-10 (matrix inversions accumulate error)
+- Fama/DKKM: rtol=1e-10 (matrix operations)
+- IPCA: rtol=1e-6 (optimization-based, more tolerance needed)
+
+**Note**: IPCA factors are identified only up to sign (±1). Use `assert_factors_equal_up_to_sign()` for comparison.
+
+### Other Tests
+
+**test_randomized_ridge.py** - Validates randomized SVD ridge regression:
+- Tests basic functionality (shape, no NaN/Inf, shrinkage effect)
+- Verifies consistency with fixed random seed
+- Benchmarks performance for production-scale problems
+
+Run with:
 ```bash
 cd tests
 python test_randomized_ridge.py
 ```
-
-**Note**: The test suite is currently being developed. Most test files are placeholders awaiting implementation.

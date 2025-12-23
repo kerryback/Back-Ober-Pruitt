@@ -13,7 +13,9 @@
       "Bash(del nul)",
       "Bash(git push:*)",
       "Bash(findstr:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(cat:*)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

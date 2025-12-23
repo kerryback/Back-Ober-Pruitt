@@ -104,12 +104,18 @@ def run_workflow_for_index(model, panel_id):
             f"STEP 5.{i}: Computing IPCA factors (K={K})"
         )
 
-    # Step 6: Clean up moments file to save disk space
+    # Step 6: Clean up moments and panel files to save disk space
     moments_file = os.path.join(DATA_DIR, f"{full_panel_id}_moments.pkl")
     if os.path.exists(moments_file):
         file_size = os.path.getsize(moments_file) / (1024**3)  # Size in GB
         os.remove(moments_file)
         print(f"\n[CLEANUP] Deleted moments file ({file_size:.2f} GB): {moments_file}")
+
+    panel_file = os.path.join(DATA_DIR, f"{full_panel_id}_panel.pkl")
+    if os.path.exists(panel_file):
+        file_size = os.path.getsize(panel_file) / (1024**3)  # Size in GB
+        os.remove(panel_file)
+        print(f"[CLEANUP] Deleted panel file ({file_size:.2f} GB): {panel_file}")
 
     # Print summary for this index
     total_time = sum([timings['generate_panel'], timings['calculate_moments'], timings['run_fama']] +
@@ -212,12 +218,18 @@ def main():
             except Exception as e:
                 failed_indices.append(i)
 
-                # Clean up moments file for failed panel (if it exists)
+                # Clean up moments and panel files for failed panel (if they exist)
                 moments_file = os.path.join(DATA_DIR, f"{model}_{i}_moments.pkl")
                 if os.path.exists(moments_file):
                     file_size = os.path.getsize(moments_file) / (1024**3)  # Size in GB
                     os.remove(moments_file)
                     print(f"\n[CLEANUP] Deleted moments file for failed panel ({file_size:.2f} GB): {moments_file}")
+
+                panel_file = os.path.join(DATA_DIR, f"{model}_{i}_panel.pkl")
+                if os.path.exists(panel_file):
+                    file_size = os.path.getsize(panel_file) / (1024**3)  # Size in GB
+                    os.remove(panel_file)
+                    print(f"[CLEANUP] Deleted panel file for failed panel ({file_size:.2f} GB): {panel_file}")
 
                 print(f"\n{'='*70}")
                 print(f"ERROR: Workflow failed for {model}_{i}")
@@ -251,7 +263,7 @@ def main():
             else:
                 full_panel_id = f"{model}_{i}"
                 print(f"\n  Index {i} ({full_panel_id}):")
-                print(f"    - Panel data: {full_panel_id}_panel.pkl")
+                print(f"    - Panel data: {full_panel_id}_panel.pkl (deleted after use)")
                 print(f"    - SDF moments: {full_panel_id}_moments.pkl (deleted after use)")
                 print(f"    - Fama factors: {full_panel_id}_fama.pkl")
                 for nfeatures in N_DKKM_FEATURES_LIST:
