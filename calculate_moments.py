@@ -114,16 +114,16 @@ def main():
 
     print(f"Loaded arrays: N={N}, T={T}")
 
-    # Import appropriate SDF compute module
+    # Import appropriate SDF compute module and get burnin from config
     if model_name == 'bgn':
         from utils_bgn import sdf_compute_bgn as sdf_module
-        burnin = 200  # BGN burnin
+        from config import BGN_BURNIN as burnin
     elif model_name == 'kp14':
         from utils_kp14 import sdf_compute_kp14 as sdf_module
-        burnin = 200  # KP14 burnin
+        from config import KP14_BURNIN as burnin
     elif model_name == 'gs21':
         from utils_gs21 import sdf_compute_gs21 as sdf_module
-        burnin = 200  # GS21 burnin
+        from config import GS21_BURNIN as burnin
     else:
         print(f"ERROR: Unknown model: {model_name}")
         sys.exit(1)
