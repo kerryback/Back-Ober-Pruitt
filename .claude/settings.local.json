@@ -15,7 +15,8 @@
       "Bash(findstr:*)",
       "Bash(git reset:*)",
       "Bash(cat:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(jupyter nbconvert:*)"
     ],
     "deny": [],
     "ask": []

@@ -239,7 +239,7 @@ def mve_data(
     Args:
         f: DataFrame of factor returns
         month: Current month
-        alpha: Ridge penalty (B-J shrinkage)
+        alpha: Ridge penalty (already scaled by caller if needed)
 
     Returns:
         Portfolio weights as Series
@@ -248,10 +248,8 @@ def mve_data(
     X = f.loc[month - 360:month - 1].dropna().to_numpy()
     y = np.ones(len(X))
 
-    # Number of factors (for penalty scaling)
-    nfeatures = X.shape[1]
-
-    # Ridge regression with penalty scaled by nfeatures to match original code
-    pi = ridge_regression_fast(X, y, alpha=360 * nfeatures * alpha)
+    # Caller is responsible for scaling alpha appropriately
+    # (DKKM scales by nfeatures, Fama doesn't)
+    pi = ridge_regression_fast(X, y, alpha=360 * alpha)
 
     return pd.Series(pi, index=f.columns)
