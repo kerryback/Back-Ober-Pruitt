@@ -10,8 +10,8 @@ import os
 # PANEL DIMENSIONS - CONFIGURE THESE FIRST
 # =============================================================================
 
-N = 50  # Number of firms
-T = 400   # Number of time periods (excluding burnin)
+N = 1000  # Number of firms
+T = 400# Number of time periods (excluding burnin)
 BGN_BURNIN = 300  # BGN burnin period
 KP14_BURNIN = 300  # KP14 burnin period
 GS21_BURNIN = 300  # GS21 burnin period

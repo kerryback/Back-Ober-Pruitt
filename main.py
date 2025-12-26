@@ -33,7 +33,9 @@ import subprocess
 import time
 import pickle
 from datetime import datetime
-from config import DATA_DIR, N_DKKM_FEATURES_LIST, IPCA_K_VALUES, KEEP_PANEL, KEEP_MOMENTS, KEEP_FACTOR_DETAILS
+from config import (DATA_DIR, N_DKKM_FEATURES_LIST, IPCA_K_VALUES,
+                    KEEP_PANEL, KEEP_MOMENTS, KEEP_FACTOR_DETAILS,
+                    N, T, BGN_BURNIN, KP14_BURNIN, GS21_BURNIN)
 
 
 def run_script(script_name, args, description):
@@ -249,6 +251,13 @@ def main():
         print("BACK-OBER-PRUITT - COMPLETE WORKFLOW")
         print("="*70)
         print(f"Started at {datetime.now().strftime('%a %d %b %Y, %I:%M%p')}")
+        print()
+        print(f"Global Parameters:")
+        print(f"  N (firms):        {N}")
+        print(f"  T (periods):      {T}")
+        print(f"  BGN burnin:       {BGN_BURNIN}")
+        print(f"  KP14 burnin:      {KP14_BURNIN}")
+        print(f"  GS21 burnin:      {GS21_BURNIN}")
         print()
         print(f"Configuration:")
         print(f"  Model: {model}")
