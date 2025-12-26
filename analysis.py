@@ -453,14 +453,26 @@ def create_fama_boxplots(fama_df: pd.DataFrame, model: str):
                 boxplot_data.append(data['sharpe'].values)
                 labels.append(f"{method_label}\n$\\alpha$={alpha:.1e}")
 
-    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
-    for patch in bp['boxes']:
-        patch.set_facecolor('lightblue')
+    # Check if all data groups have only 1 point
+    all_single = all(len(d) == 1 for d in boxplot_data)
+
+    if all_single:
+        # Plot as points instead of boxplots
+        positions = range(1, len(boxplot_data) + 1)
+        values = [d[0] for d in boxplot_data]
+        ax.plot(positions, values, 'o', markersize=8, color='steelblue', markerfacecolor='lightblue',
+                markeredgewidth=1.5, markeredgecolor='steelblue')
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels, rotation=45, ha='right')
+    else:
+        bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+        for patch in bp['boxes']:
+            patch.set_facecolor('lightblue')
+        plt.xticks(rotation=45, ha='right')
 
     ax.set_ylabel('Sharpe Ratio', fontsize=12)
     ax.set_title(f'{model.upper()} - Fama Sharpe Ratios (Distribution Across Panels)', fontsize=14)
     ax.grid(True, alpha=0.3, axis='y')
-    plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
 
     sharpe_path = FIGURES_DIR / f"{model}_fama_sharpe_boxplot.pdf"
@@ -481,14 +493,26 @@ def create_fama_boxplots(fama_df: pd.DataFrame, model: str):
                 boxplot_data.append(data['hjd'].values)
                 labels.append(f"{method_label}\n$\\alpha$={alpha:.1e}")
 
-    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
-    for patch in bp['boxes']:
-        patch.set_facecolor('lightcoral')
+    # Check if all data groups have only 1 point
+    all_single = all(len(d) == 1 for d in boxplot_data)
+
+    if all_single:
+        # Plot as points instead of boxplots
+        positions = range(1, len(boxplot_data) + 1)
+        values = [d[0] for d in boxplot_data]
+        ax.plot(positions, values, 'o', markersize=8, color='indianred', markerfacecolor='lightcoral',
+                markeredgewidth=1.5, markeredgecolor='indianred')
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels, rotation=45, ha='right')
+    else:
+        bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+        for patch in bp['boxes']:
+            patch.set_facecolor('lightcoral')
+        plt.xticks(rotation=45, ha='right')
 
     ax.set_ylabel('Hansen-Jagannathan Distance', fontsize=12)
     ax.set_title(f'{model.upper()} - Fama HJ Distances (Distribution Across Panels)', fontsize=14)
     ax.grid(True, alpha=0.3, axis='y')
-    plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
 
     hjd_path = FIGURES_DIR / f"{model}_fama_hjd_boxplot.pdf"
@@ -520,14 +544,26 @@ def create_dkkm_boxplots(dkkm_df: pd.DataFrame, model: str):
                 boxplot_data.append(data['sharpe'].values)
                 labels.append(f"$\\alpha$={alpha:.1e}\nn={nf}")
 
-    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
-    for patch in bp['boxes']:
-        patch.set_facecolor('lightblue')
+    # Check if all data groups have only 1 point
+    all_single = all(len(d) == 1 for d in boxplot_data)
+
+    if all_single:
+        # Plot as points instead of boxplots
+        positions = range(1, len(boxplot_data) + 1)
+        values = [d[0] for d in boxplot_data]
+        ax.plot(positions, values, 'o', markersize=8, color='steelblue', markerfacecolor='lightblue',
+                markeredgewidth=1.5, markeredgecolor='steelblue')
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=8)
+    else:
+        bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+        for patch in bp['boxes']:
+            patch.set_facecolor('lightblue')
+        plt.xticks(rotation=45, ha='right', fontsize=8)
 
     ax.set_ylabel('Sharpe Ratio', fontsize=12)
     ax.set_title(f'{model.upper()} - DKKM Sharpe Ratios (Distribution Across Panels)', fontsize=14)
     ax.grid(True, alpha=0.3, axis='y')
-    plt.xticks(rotation=45, ha='right', fontsize=8)
     plt.tight_layout()
 
     sharpe_path = FIGURES_DIR / f"{model}_dkkm_sharpe_boxplot.pdf"
@@ -548,14 +584,26 @@ def create_dkkm_boxplots(dkkm_df: pd.DataFrame, model: str):
                 boxplot_data.append(data['hjd'].values)
                 labels.append(f"$\\alpha$={alpha:.1e}\nn={nf}")
 
-    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
-    for patch in bp['boxes']:
-        patch.set_facecolor('lightcoral')
+    # Check if all data groups have only 1 point
+    all_single = all(len(d) == 1 for d in boxplot_data)
+
+    if all_single:
+        # Plot as points instead of boxplots
+        positions = range(1, len(boxplot_data) + 1)
+        values = [d[0] for d in boxplot_data]
+        ax.plot(positions, values, 'o', markersize=8, color='indianred', markerfacecolor='lightcoral',
+                markeredgewidth=1.5, markeredgecolor='indianred')
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=8)
+    else:
+        bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+        for patch in bp['boxes']:
+            patch.set_facecolor('lightcoral')
+        plt.xticks(rotation=45, ha='right', fontsize=8)
 
     ax.set_ylabel('Hansen-Jagannathan Distance', fontsize=12)
     ax.set_title(f'{model.upper()} - DKKM HJ Distances (Distribution Across Panels)', fontsize=14)
     ax.grid(True, alpha=0.3, axis='y')
-    plt.xticks(rotation=45, ha='right', fontsize=8)
     plt.tight_layout()
 
     hjd_path = FIGURES_DIR / f"{model}_dkkm_hjd_boxplot.pdf"
@@ -587,14 +635,26 @@ def create_ipca_boxplots(ipca_df: pd.DataFrame, model: str):
                 boxplot_data.append(data['sharpe'].values)
                 labels.append(f"$\\alpha$={alpha:.1e}\nK={K}")
 
-    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
-    for patch in bp['boxes']:
-        patch.set_facecolor('lightblue')
+    # Check if all data groups have only 1 point
+    all_single = all(len(d) == 1 for d in boxplot_data)
+
+    if all_single:
+        # Plot as points instead of boxplots
+        positions = range(1, len(boxplot_data) + 1)
+        values = [d[0] for d in boxplot_data]
+        ax.plot(positions, values, 'o', markersize=8, color='steelblue', markerfacecolor='lightblue',
+                markeredgewidth=1.5, markeredgecolor='steelblue')
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=9)
+    else:
+        bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+        for patch in bp['boxes']:
+            patch.set_facecolor('lightblue')
+        plt.xticks(rotation=45, ha='right', fontsize=9)
 
     ax.set_ylabel('Sharpe Ratio', fontsize=12)
     ax.set_title(f'{model.upper()} - IPCA Sharpe Ratios (Distribution Across Panels)', fontsize=14)
     ax.grid(True, alpha=0.3, axis='y')
-    plt.xticks(rotation=45, ha='right', fontsize=9)
     plt.tight_layout()
 
     sharpe_path = FIGURES_DIR / f"{model}_ipca_sharpe_boxplot.pdf"
@@ -615,14 +675,26 @@ def create_ipca_boxplots(ipca_df: pd.DataFrame, model: str):
                 boxplot_data.append(data['hjd'].values)
                 labels.append(f"$\\alpha$={alpha:.1e}\nK={K}")
 
-    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
-    for patch in bp['boxes']:
-        patch.set_facecolor('lightcoral')
+    # Check if all data groups have only 1 point
+    all_single = all(len(d) == 1 for d in boxplot_data)
+
+    if all_single:
+        # Plot as points instead of boxplots
+        positions = range(1, len(boxplot_data) + 1)
+        values = [d[0] for d in boxplot_data]
+        ax.plot(positions, values, 'o', markersize=8, color='indianred', markerfacecolor='lightcoral',
+                markeredgewidth=1.5, markeredgecolor='indianred')
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=9)
+    else:
+        bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+        for patch in bp['boxes']:
+            patch.set_facecolor('lightcoral')
+        plt.xticks(rotation=45, ha='right', fontsize=9)
 
     ax.set_ylabel('Hansen-Jagannathan Distance', fontsize=12)
     ax.set_title(f'{model.upper()} - IPCA HJ Distances (Distribution Across Panels)', fontsize=14)
     ax.grid(True, alpha=0.3, axis='y')
-    plt.xticks(rotation=45, ha='right', fontsize=9)
     plt.tight_layout()
 
     hjd_path = FIGURES_DIR / f"{model}_ipca_hjd_boxplot.pdf"
