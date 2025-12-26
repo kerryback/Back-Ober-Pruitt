@@ -27,18 +27,23 @@ import pickle
 from pathlib import Path
 from typing import Dict, List
 import glob
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import DATA_DIR
 
-# Output directory
+# Output directories
 SCRIPT_DIR = Path(__file__).parent
 TABLES_DIR = SCRIPT_DIR / "tables"
+FIGURES_DIR = SCRIPT_DIR / "figures"
 
-# Create output directory if it doesn't exist
+# Create output directories if they don't exist
 TABLES_DIR.mkdir(exist_ok=True)
+FIGURES_DIR.mkdir(exist_ok=True)
 
 # Configuration
 MODELS = ['bgn', 'kp14', 'gs21']
@@ -426,16 +431,217 @@ def create_ipca_tables(ipca_df: pd.DataFrame, model: str, sharpe_path: str, hjd_
     print(f"  Saved {hjd_path}")
 
 
+def create_fama_boxplots(fama_df: pd.DataFrame, model: str):
+    """Create Fama boxplots for sharpe and hjd distributions across panels."""
+    if len(fama_df) == 0:
+        print(f"  WARNING: No Fama data for {model}")
+        return
+
+    # Get unique alphas
+    alphas = sorted(fama_df['alpha'].unique())
+
+    # Create sharpe boxplot
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    boxplot_data = []
+    labels = []
+
+    for alpha in alphas:
+        for method, method_label in [('ff', 'FFC'), ('fm', 'FMR')]:
+            data = fama_df[(fama_df['alpha'] == alpha) & (fama_df['method'] == method)]
+            if len(data) > 0:
+                boxplot_data.append(data['sharpe'].values)
+                labels.append(f"{method_label}\n$\\alpha$={alpha:.1e}")
+
+    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+    for patch in bp['boxes']:
+        patch.set_facecolor('lightblue')
+
+    ax.set_ylabel('Sharpe Ratio', fontsize=12)
+    ax.set_title(f'{model.upper()} - Fama Sharpe Ratios (Distribution Across Panels)', fontsize=14)
+    ax.grid(True, alpha=0.3, axis='y')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+
+    sharpe_path = FIGURES_DIR / f"{model}_fama_sharpe_boxplot.pdf"
+    plt.savefig(sharpe_path, bbox_inches='tight')
+    print(f"  Saved {sharpe_path}")
+    plt.close()
+
+    # Create hjd boxplot
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    boxplot_data = []
+    labels = []
+
+    for alpha in alphas:
+        for method, method_label in [('ff', 'FFC'), ('fm', 'FMR')]:
+            data = fama_df[(fama_df['alpha'] == alpha) & (fama_df['method'] == method)]
+            if len(data) > 0:
+                boxplot_data.append(data['hjd'].values)
+                labels.append(f"{method_label}\n$\\alpha$={alpha:.1e}")
+
+    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+    for patch in bp['boxes']:
+        patch.set_facecolor('lightcoral')
+
+    ax.set_ylabel('Hansen-Jagannathan Distance', fontsize=12)
+    ax.set_title(f'{model.upper()} - Fama HJ Distances (Distribution Across Panels)', fontsize=14)
+    ax.grid(True, alpha=0.3, axis='y')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+
+    hjd_path = FIGURES_DIR / f"{model}_fama_hjd_boxplot.pdf"
+    plt.savefig(hjd_path, bbox_inches='tight')
+    print(f"  Saved {hjd_path}")
+    plt.close()
+
+
+def create_dkkm_boxplots(dkkm_df: pd.DataFrame, model: str):
+    """Create DKKM boxplots for sharpe and hjd distributions across panels."""
+    if len(dkkm_df) == 0:
+        print(f"  WARNING: No DKKM data for {model}")
+        return
+
+    # Get unique alphas and num_factors
+    alphas = sorted(dkkm_df['alpha'].unique())
+    num_factors_vals = sorted(dkkm_df['num_factors'].unique())
+
+    # Create sharpe boxplot
+    fig, ax = plt.subplots(figsize=(14, 6))
+
+    boxplot_data = []
+    labels = []
+
+    for alpha in alphas:
+        for nf in num_factors_vals:
+            data = dkkm_df[(dkkm_df['alpha'] == alpha) & (dkkm_df['num_factors'] == nf)]
+            if len(data) > 0:
+                boxplot_data.append(data['sharpe'].values)
+                labels.append(f"$\\alpha$={alpha:.1e}\nn={nf}")
+
+    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+    for patch in bp['boxes']:
+        patch.set_facecolor('lightblue')
+
+    ax.set_ylabel('Sharpe Ratio', fontsize=12)
+    ax.set_title(f'{model.upper()} - DKKM Sharpe Ratios (Distribution Across Panels)', fontsize=14)
+    ax.grid(True, alpha=0.3, axis='y')
+    plt.xticks(rotation=45, ha='right', fontsize=8)
+    plt.tight_layout()
+
+    sharpe_path = FIGURES_DIR / f"{model}_dkkm_sharpe_boxplot.pdf"
+    plt.savefig(sharpe_path, bbox_inches='tight')
+    print(f"  Saved {sharpe_path}")
+    plt.close()
+
+    # Create hjd boxplot
+    fig, ax = plt.subplots(figsize=(14, 6))
+
+    boxplot_data = []
+    labels = []
+
+    for alpha in alphas:
+        for nf in num_factors_vals:
+            data = dkkm_df[(dkkm_df['alpha'] == alpha) & (dkkm_df['num_factors'] == nf)]
+            if len(data) > 0:
+                boxplot_data.append(data['hjd'].values)
+                labels.append(f"$\\alpha$={alpha:.1e}\nn={nf}")
+
+    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+    for patch in bp['boxes']:
+        patch.set_facecolor('lightcoral')
+
+    ax.set_ylabel('Hansen-Jagannathan Distance', fontsize=12)
+    ax.set_title(f'{model.upper()} - DKKM HJ Distances (Distribution Across Panels)', fontsize=14)
+    ax.grid(True, alpha=0.3, axis='y')
+    plt.xticks(rotation=45, ha='right', fontsize=8)
+    plt.tight_layout()
+
+    hjd_path = FIGURES_DIR / f"{model}_dkkm_hjd_boxplot.pdf"
+    plt.savefig(hjd_path, bbox_inches='tight')
+    print(f"  Saved {hjd_path}")
+    plt.close()
+
+
+def create_ipca_boxplots(ipca_df: pd.DataFrame, model: str):
+    """Create IPCA boxplots for sharpe and hjd distributions across panels."""
+    if len(ipca_df) == 0:
+        print(f"  WARNING: No IPCA data for {model}")
+        return
+
+    # Get unique alphas and num_factors (K values)
+    alphas = sorted(ipca_df['alpha'].unique())
+    num_factors_vals = sorted(ipca_df['num_factors'].unique())
+
+    # Create sharpe boxplot
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    boxplot_data = []
+    labels = []
+
+    for alpha in alphas:
+        for K in num_factors_vals:
+            data = ipca_df[(ipca_df['alpha'] == alpha) & (ipca_df['num_factors'] == K)]
+            if len(data) > 0:
+                boxplot_data.append(data['sharpe'].values)
+                labels.append(f"$\\alpha$={alpha:.1e}\nK={K}")
+
+    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+    for patch in bp['boxes']:
+        patch.set_facecolor('lightblue')
+
+    ax.set_ylabel('Sharpe Ratio', fontsize=12)
+    ax.set_title(f'{model.upper()} - IPCA Sharpe Ratios (Distribution Across Panels)', fontsize=14)
+    ax.grid(True, alpha=0.3, axis='y')
+    plt.xticks(rotation=45, ha='right', fontsize=9)
+    plt.tight_layout()
+
+    sharpe_path = FIGURES_DIR / f"{model}_ipca_sharpe_boxplot.pdf"
+    plt.savefig(sharpe_path, bbox_inches='tight')
+    print(f"  Saved {sharpe_path}")
+    plt.close()
+
+    # Create hjd boxplot
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    boxplot_data = []
+    labels = []
+
+    for alpha in alphas:
+        for K in num_factors_vals:
+            data = ipca_df[(ipca_df['alpha'] == alpha) & (ipca_df['num_factors'] == K)]
+            if len(data) > 0:
+                boxplot_data.append(data['hjd'].values)
+                labels.append(f"$\\alpha$={alpha:.1e}\nK={K}")
+
+    bp = ax.boxplot(boxplot_data, labels=labels, patch_artist=True)
+    for patch in bp['boxes']:
+        patch.set_facecolor('lightcoral')
+
+    ax.set_ylabel('Hansen-Jagannathan Distance', fontsize=12)
+    ax.set_title(f'{model.upper()} - IPCA HJ Distances (Distribution Across Panels)', fontsize=14)
+    ax.grid(True, alpha=0.3, axis='y')
+    plt.xticks(rotation=45, ha='right', fontsize=9)
+    plt.tight_layout()
+
+    hjd_path = FIGURES_DIR / f"{model}_ipca_hjd_boxplot.pdf"
+    plt.savefig(hjd_path, bbox_inches='tight')
+    print(f"  Saved {hjd_path}")
+    plt.close()
+
+
 def generate_pdf():
-    """Generate a PDF containing all LaTeX tables."""
+    """Generate a PDF containing all LaTeX tables and figures."""
     import subprocess
 
     # Create master LaTeX document
-    master_tex = TABLES_DIR / "all_tables.tex"
+    master_tex = TABLES_DIR / "all_results.tex"
 
     with open(master_tex, 'w') as f:
         f.write(r"\documentclass[11pt]{article}" + "\n")
         f.write(r"\usepackage{booktabs}" + "\n")
+        f.write(r"\usepackage{graphicx}" + "\n")
         f.write(r"\usepackage{geometry}" + "\n")
         f.write(r"\geometry{margin=1in}" + "\n")
         f.write(r"\begin{document}" + "\n")
@@ -444,17 +650,44 @@ def generate_pdf():
         f.write(r"\author{}" + "\n")
         f.write(r"\date{\today}" + "\n")
         f.write(r"\maketitle" + "\n")
+        f.write(r"\tableofcontents" + "\n")
+        f.write(r"\clearpage" + "\n")
         f.write("\n")
 
-        # Include all tables for each model
+        # Include all tables and figures for each model
         for model in MODELS:
             f.write(f"\n\\section{{{model.upper()} Model Results}}\n\n")
+
+            # Fama results
+            f.write(f"\\subsection{{Fama-French Results}}\n\n")
 
             # Fama table
             fama_file = f"{model}_fama.tex"
             if (TABLES_DIR / fama_file).exists():
                 f.write(f"\\input{{{fama_file}}}\n")
                 f.write("\\clearpage\n\n")
+
+            # Fama figures
+            fama_sharpe_fig = f"..{os.sep}figures{os.sep}{model}_fama_sharpe_boxplot.pdf"
+            if (FIGURES_DIR / f"{model}_fama_sharpe_boxplot.pdf").exists():
+                f.write("\\begin{figure}[h]\n")
+                f.write("\\centering\n")
+                f.write(f"\\includegraphics[width=0.9\\textwidth]{{{fama_sharpe_fig}}}\n")
+                f.write(f"\\caption{{Fama Sharpe Ratio Distribution - {model.upper()}}}\n")
+                f.write("\\end{figure}\n")
+                f.write("\\clearpage\n\n")
+
+            fama_hjd_fig = f"..{os.sep}figures{os.sep}{model}_fama_hjd_boxplot.pdf"
+            if (FIGURES_DIR / f"{model}_fama_hjd_boxplot.pdf").exists():
+                f.write("\\begin{figure}[h]\n")
+                f.write("\\centering\n")
+                f.write(f"\\includegraphics[width=0.9\\textwidth]{{{fama_hjd_fig}}}\n")
+                f.write(f"\\caption{{Fama HJ Distance Distribution - {model.upper()}}}\n")
+                f.write("\\end{figure}\n")
+                f.write("\\clearpage\n\n")
+
+            # DKKM results
+            f.write(f"\\subsection{{DKKM Results}}\n\n")
 
             # DKKM tables
             dkkm_sharpe_file = f"{model}_dkkm_sharpe.tex"
@@ -467,6 +700,28 @@ def generate_pdf():
                 f.write(f"\\input{{{dkkm_hjd_file}}}\n")
                 f.write("\\clearpage\n\n")
 
+            # DKKM figures
+            dkkm_sharpe_fig = f"..{os.sep}figures{os.sep}{model}_dkkm_sharpe_boxplot.pdf"
+            if (FIGURES_DIR / f"{model}_dkkm_sharpe_boxplot.pdf").exists():
+                f.write("\\begin{figure}[h]\n")
+                f.write("\\centering\n")
+                f.write(f"\\includegraphics[width=0.9\\textwidth]{{{dkkm_sharpe_fig}}}\n")
+                f.write(f"\\caption{{DKKM Sharpe Ratio Distribution - {model.upper()}}}\n")
+                f.write("\\end{figure}\n")
+                f.write("\\clearpage\n\n")
+
+            dkkm_hjd_fig = f"..{os.sep}figures{os.sep}{model}_dkkm_hjd_boxplot.pdf"
+            if (FIGURES_DIR / f"{model}_dkkm_hjd_boxplot.pdf").exists():
+                f.write("\\begin{figure}[h]\n")
+                f.write("\\centering\n")
+                f.write(f"\\includegraphics[width=0.9\\textwidth]{{{dkkm_hjd_fig}}}\n")
+                f.write(f"\\caption{{DKKM HJ Distance Distribution - {model.upper()}}}\n")
+                f.write("\\end{figure}\n")
+                f.write("\\clearpage\n\n")
+
+            # IPCA results
+            f.write(f"\\subsection{{IPCA Results}}\n\n")
+
             # IPCA tables
             ipca_sharpe_file = f"{model}_ipca_sharpe.tex"
             if (TABLES_DIR / ipca_sharpe_file).exists():
@@ -478,28 +733,47 @@ def generate_pdf():
                 f.write(f"\\input{{{ipca_hjd_file}}}\n")
                 f.write("\\clearpage\n\n")
 
+            # IPCA figures
+            ipca_sharpe_fig = f"..{os.sep}figures{os.sep}{model}_ipca_sharpe_boxplot.pdf"
+            if (FIGURES_DIR / f"{model}_ipca_sharpe_boxplot.pdf").exists():
+                f.write("\\begin{figure}[h]\n")
+                f.write("\\centering\n")
+                f.write(f"\\includegraphics[width=0.9\\textwidth]{{{ipca_sharpe_fig}}}\n")
+                f.write(f"\\caption{{IPCA Sharpe Ratio Distribution - {model.upper()}}}\n")
+                f.write("\\end{figure}\n")
+                f.write("\\clearpage\n\n")
+
+            ipca_hjd_fig = f"..{os.sep}figures{os.sep}{model}_ipca_hjd_boxplot.pdf"
+            if (FIGURES_DIR / f"{model}_ipca_hjd_boxplot.pdf").exists():
+                f.write("\\begin{figure}[h]\n")
+                f.write("\\centering\n")
+                f.write(f"\\includegraphics[width=0.9\\textwidth]{{{ipca_hjd_fig}}}\n")
+                f.write(f"\\caption{{IPCA HJ Distance Distribution - {model.upper()}}}\n")
+                f.write("\\end{figure}\n")
+                f.write("\\clearpage\n\n")
+
         f.write(r"\end{document}" + "\n")
 
     print(f"  Created master LaTeX file: {master_tex}")
 
-    # Compile PDF using pdflatex (run twice for references)
+    # Compile PDF using pdflatex (run twice for table of contents and references)
     try:
         for _ in range(2):
             subprocess.run(
-                ['pdflatex', '-interaction=nonstopmode', 'all_tables.tex'],
+                ['pdflatex', '-interaction=nonstopmode', 'all_results.tex'],
                 cwd=str(TABLES_DIR),
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=120
             )
 
-        pdf_file = TABLES_DIR / "all_tables.pdf"
+        pdf_file = TABLES_DIR / "all_results.pdf"
         if pdf_file.exists():
             print(f"  PDF generated successfully: {pdf_file}")
 
             # Clean up auxiliary files
-            for ext in ['.aux', '.log', '.out']:
-                aux_file = TABLES_DIR / f"all_tables{ext}"
+            for ext in ['.aux', '.log', '.out', '.toc']:
+                aux_file = TABLES_DIR / f"all_results{ext}"
                 if aux_file.exists():
                     aux_file.unlink()
         else:
@@ -561,6 +835,12 @@ def main():
         ipca_hjd_path = TABLES_DIR / f"{model}_ipca_hjd.tex"
         create_ipca_tables(ipca_df, model, str(ipca_sharpe_path), str(ipca_hjd_path))
 
+        # Create figures
+        print("  Creating figures...")
+        create_fama_boxplots(fama_df, model)
+        create_dkkm_boxplots(dkkm_df, model)
+        create_ipca_boxplots(ipca_df, model)
+
         print()
 
     # Generate PDF with all tables
@@ -572,7 +852,8 @@ def main():
     print("="*70)
     print()
     print(f"Tables: {TABLES_DIR}/")
-    print(f"PDF: {TABLES_DIR / 'all_tables.pdf'}")
+    print(f"Figures: {FIGURES_DIR}/")
+    print(f"PDF: {TABLES_DIR / 'all_results.pdf'}")
 
 
 if __name__ == "__main__":
