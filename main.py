@@ -252,6 +252,10 @@ def main():
     log_file = os.path.join(logs_dir, f"{model}_{start}_{end}.log")
 
     # Redirect stdout and stderr to log file
+    print(f"Redirecting output to log file: {log_file}")
+    print("(All subsequent output will be written to the log file)")
+    print()
+
     original_stdout = sys.stdout
     original_stderr = sys.stderr
 
