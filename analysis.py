@@ -426,6 +426,95 @@ def create_ipca_tables(ipca_df: pd.DataFrame, model: str, sharpe_path: str, hjd_
     print(f"  Saved {hjd_path}")
 
 
+def generate_pdf():
+    """Generate a PDF containing all LaTeX tables."""
+    import subprocess
+
+    # Create master LaTeX document
+    master_tex = TABLES_DIR / "all_tables.tex"
+
+    with open(master_tex, 'w') as f:
+        f.write(r"\documentclass[11pt]{article}" + "\n")
+        f.write(r"\usepackage{booktabs}" + "\n")
+        f.write(r"\usepackage{geometry}" + "\n")
+        f.write(r"\geometry{margin=1in}" + "\n")
+        f.write(r"\begin{document}" + "\n")
+        f.write("\n")
+        f.write(r"\title{Back-Ober-Pruitt Factor Model Results}" + "\n")
+        f.write(r"\author{}" + "\n")
+        f.write(r"\date{\today}" + "\n")
+        f.write(r"\maketitle" + "\n")
+        f.write("\n")
+
+        # Include all tables for each model
+        for model in MODELS:
+            f.write(f"\n\\section{{{model.upper()} Model Results}}\n\n")
+
+            # Fama table
+            fama_file = f"{model}_fama.tex"
+            if (TABLES_DIR / fama_file).exists():
+                f.write(f"\\input{{{fama_file}}}\n")
+                f.write("\\clearpage\n\n")
+
+            # DKKM tables
+            dkkm_sharpe_file = f"{model}_dkkm_sharpe.tex"
+            if (TABLES_DIR / dkkm_sharpe_file).exists():
+                f.write(f"\\input{{{dkkm_sharpe_file}}}\n")
+                f.write("\\clearpage\n\n")
+
+            dkkm_hjd_file = f"{model}_dkkm_hjd.tex"
+            if (TABLES_DIR / dkkm_hjd_file).exists():
+                f.write(f"\\input{{{dkkm_hjd_file}}}\n")
+                f.write("\\clearpage\n\n")
+
+            # IPCA tables
+            ipca_sharpe_file = f"{model}_ipca_sharpe.tex"
+            if (TABLES_DIR / ipca_sharpe_file).exists():
+                f.write(f"\\input{{{ipca_sharpe_file}}}\n")
+                f.write("\\clearpage\n\n")
+
+            ipca_hjd_file = f"{model}_ipca_hjd.tex"
+            if (TABLES_DIR / ipca_hjd_file).exists():
+                f.write(f"\\input{{{ipca_hjd_file}}}\n")
+                f.write("\\clearpage\n\n")
+
+        f.write(r"\end{document}" + "\n")
+
+    print(f"  Created master LaTeX file: {master_tex}")
+
+    # Compile PDF using pdflatex (run twice for references)
+    try:
+        for _ in range(2):
+            subprocess.run(
+                ['pdflatex', '-interaction=nonstopmode', 'all_tables.tex'],
+                cwd=str(TABLES_DIR),
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+        pdf_file = TABLES_DIR / "all_tables.pdf"
+        if pdf_file.exists():
+            print(f"  PDF generated successfully: {pdf_file}")
+
+            # Clean up auxiliary files
+            for ext in ['.aux', '.log', '.out']:
+                aux_file = TABLES_DIR / f"all_tables{ext}"
+                if aux_file.exists():
+                    aux_file.unlink()
+        else:
+            print(f"  WARNING: PDF generation failed (pdflatex may not be installed)")
+            print(f"  You can manually compile {master_tex} with pdflatex")
+
+    except FileNotFoundError:
+        print(f"  WARNING: pdflatex not found - skipping PDF generation")
+        print(f"  You can manually compile {master_tex} with pdflatex")
+    except subprocess.TimeoutExpired:
+        print(f"  WARNING: pdflatex timed out")
+    except Exception as e:
+        print(f"  WARNING: PDF generation failed: {e}")
+
+
 def main():
     """Main analysis function."""
     print("="*70)
@@ -459,26 +548,31 @@ def main():
         print("  Creating tables...")
 
         # Table 1: Fama
-        fama_path = TABLES_DIR / f"fama_{model}.tex"
+        fama_path = TABLES_DIR / f"{model}_fama.tex"
         create_fama_table(fama_df, model, str(fama_path))
 
         # Tables 2-3: DKKM
-        dkkm_sharpe_path = TABLES_DIR / f"dkkm_sharpe_{model}.tex"
-        dkkm_hjd_path = TABLES_DIR / f"dkkm_hjd_{model}.tex"
+        dkkm_sharpe_path = TABLES_DIR / f"{model}_dkkm_sharpe.tex"
+        dkkm_hjd_path = TABLES_DIR / f"{model}_dkkm_hjd.tex"
         create_dkkm_tables(dkkm_df, model, str(dkkm_sharpe_path), str(dkkm_hjd_path))
 
         # Tables 4-5: IPCA
-        ipca_sharpe_path = TABLES_DIR / f"ipca_sharpe_{model}.tex"
-        ipca_hjd_path = TABLES_DIR / f"ipca_hjd_{model}.tex"
+        ipca_sharpe_path = TABLES_DIR / f"{model}_ipca_sharpe.tex"
+        ipca_hjd_path = TABLES_DIR / f"{model}_ipca_hjd.tex"
         create_ipca_tables(ipca_df, model, str(ipca_sharpe_path), str(ipca_hjd_path))
 
         print()
+
+    # Generate PDF with all tables
+    print("Generating PDF...")
+    generate_pdf()
 
     print("="*70)
     print("ANALYSIS COMPLETE")
     print("="*70)
     print()
     print(f"Tables: {TABLES_DIR}/")
+    print(f"PDF: {TABLES_DIR / 'all_tables.pdf'}")
 
 
 if __name__ == "__main__":
