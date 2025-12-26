@@ -17,8 +17,8 @@ import os
 import numpy as np
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add root directory to path (two levels up: test_utils -> tests -> root)
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Fixed seed for reproducibility in testing
 TEST_SEED = 12345
@@ -41,8 +41,8 @@ def main():
     # This will use the seed we just set
     sys.argv = ['generate_panel.py', model, str(identifier)]
 
-    # Change to parent directory so generate_panel.py runs from correct location
-    os.chdir(str(Path(__file__).parent.parent))
+    # Change to root directory so generate_panel.py runs from correct location
+    os.chdir(str(Path(__file__).parent.parent.parent))
 
     # Import and run
     from generate_panel import main as generate_main
