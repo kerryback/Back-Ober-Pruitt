@@ -117,7 +117,7 @@ def load_dkkm_results(model: str, panel_indices: List[int],
                 dkkm_stats = dkkm_stats.copy()
                 dkkm_stats['panel'] = panel_idx
                 dkkm_stats['model_type'] = model
-                dkkm_stats['factors'] = nfeatures
+                dkkm_stats['num_factors'] = nfeatures
                 all_results.append(dkkm_stats)
 
     if all_results:
@@ -149,7 +149,7 @@ def load_ipca_results(model: str, panel_indices: List[int],
                 ipca_stats = ipca_stats.copy()
                 ipca_stats['panel'] = panel_idx
                 ipca_stats['model_type'] = model
-                ipca_stats['factors'] = K
+                ipca_stats['num_factors'] = K
                 all_results.append(ipca_stats)
 
     if all_results:
@@ -171,8 +171,8 @@ def create_dkkm_figure(dkkm: pd.DataFrame, ffc: pd.DataFrame, fmr: pd.DataFrame,
         return
 
     # Compute group means across panels
-    mean_sharpe = dkkm_filtered.groupby(['kappa', 'factors'])['sharpe'].mean().reset_index()
-    mean_hjd = dkkm_filtered.groupby(['kappa', 'factors'])['hjd'].mean().reset_index()
+    mean_sharpe = dkkm_filtered.groupby(['kappa', 'num_factors'])['sharpe'].mean().reset_index()
+    mean_hjd = dkkm_filtered.groupby(['kappa', 'num_factors'])['hjd'].mean().reset_index()
 
     # Create side-by-side panels
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
@@ -180,7 +180,7 @@ def create_dkkm_figure(dkkm: pd.DataFrame, ffc: pd.DataFrame, fmr: pd.DataFrame,
     # Left panel: Sharpe ratios
     for kappa in mean_sharpe['kappa'].unique():
         data = mean_sharpe[mean_sharpe['kappa'] == kappa]
-        ax1.plot(data['factors'], data['sharpe'], marker='o', linewidth=2, label=f'$\\kappa$={kappa:.4g}')
+        ax1.plot(data['num_factors'], data['sharpe'], marker='o', linewidth=2, label=f'$\\kappa$={kappa:.4g}')
 
     ax1.axhline(ffc.sharpe.mean(), linewidth=2, label='FFC', color='lightgreen', linestyle='--')
     ax1.axhline(fmr.sharpe.mean(), linewidth=2, label='FMR', color='brown', linestyle='--')
@@ -194,7 +194,7 @@ def create_dkkm_figure(dkkm: pd.DataFrame, ffc: pd.DataFrame, fmr: pd.DataFrame,
     # Right panel: HJ distances
     for kappa in mean_hjd['kappa'].unique():
         data = mean_hjd[mean_hjd['kappa'] == kappa]
-        ax2.plot(data['factors'], data['hjd'], marker='o', linewidth=2, label=f'$\\kappa$={kappa:.4g}')
+        ax2.plot(data['num_factors'], data['hjd'], marker='o', linewidth=2, label=f'$\\kappa$={kappa:.4g}')
 
     ax2.axhline(ffc.hjd.mean(), linewidth=2, label='FFC', color='lightgreen', linestyle='--')
     ax2.axhline(fmr.hjd.mean(), linewidth=2, label='FMR', color='brown', linestyle='--')
@@ -295,7 +295,7 @@ def create_dkkm_table(dkkm_all: pd.DataFrame, fama_all: pd.DataFrame, output_pat
                 row = [model.upper(), f"{kappa:.6f}"]
 
                 for nfeatures in DKKM_NFEATURES:
-                    nf_data = kappa_data[kappa_data['factors'] == nfeatures]
+                    nf_data = kappa_data[kappa_data['num_factors'] == nfeatures]
                     if len(nf_data) > 0:
                         # Mean raw value
                         dkkm_value = nf_data[metric].mean()
@@ -391,7 +391,7 @@ def create_dkkm_boxplots(dkkm_all: pd.DataFrame, output_path: str, model: str = 
         return
 
     # Calculate panel-level means
-    panel_means = model_dkkm.groupby(['kappa', 'factors', 'panel']).agg({
+    panel_means = model_dkkm.groupby(['kappa', 'num_factors', 'panel']).agg({
         'sharpe': 'mean',
         'hjd': 'mean'
     }).reset_index()
@@ -402,9 +402,9 @@ def create_dkkm_boxplots(dkkm_all: pd.DataFrame, output_path: str, model: str = 
     # Create figure with two subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-    # Prepare data for boxplots - organize by factors, with kappa as hue
+    # Prepare data for boxplots - organize by num_factors, with kappa as hue
     for nfeatures in DKKM_NFEATURES:
-        factor_data = panel_means[panel_means['factors'] == nfeatures]
+        factor_data = panel_means[panel_means['num_factors'] == nfeatures]
 
         boxplot_data_sharpe = []
         boxplot_data_hjd = []
@@ -441,7 +441,7 @@ def create_dkkm_boxplots(dkkm_all: pd.DataFrame, output_path: str, model: str = 
     for nfeatures in DKKM_NFEATURES:
         for kappa in selected_kappas:
             kappa_factor_data = panel_means[(panel_means['kappa'] == kappa) &
-                                           (panel_means['factors'] == nfeatures)]
+                                           (panel_means['num_factors'] == nfeatures)]
             if len(kappa_factor_data) > 0:
                 boxplot_data_sharpe.append(kappa_factor_data['sharpe'].values)
                 boxplot_data_hjd.append(kappa_factor_data['hjd'].values)

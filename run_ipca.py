@@ -241,6 +241,7 @@ def main():
 
         ipca_stats = portfolio_stats.compute_ipca_portfolio_stats(
             ipca_factors,
+            ipca_weights,
             panel,
             panel_id=panel_id,
             model=model_name,

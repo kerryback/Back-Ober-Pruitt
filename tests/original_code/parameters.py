@@ -1,4 +1,10 @@
 import numpy as np
+import sys
+from pathlib import Path
+
+# Import burnin from main config.py (two directories up from tests/original_code/)
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from config import BGN_BURNIN as burnin
 
 pi = 0.99
 rbar = 0.006236
@@ -9,7 +15,6 @@ sigma_z = 0.4
 Cbar = -3.7
 Chat = np.exp(Cbar)
 I = 1
-burnin = 300  # Updated to match current code's BGN_BURNIN
 gamma_grid = np.arange(0.5, 1.1, 0.1)
 chars = ["size", "bm", "agr", "roe", "mom"]
 names = ["smb", "hml", "cma", "rmw", "umd"]

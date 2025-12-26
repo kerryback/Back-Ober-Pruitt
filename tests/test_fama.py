@@ -67,11 +67,11 @@ CURRENT CODE (utils_factors/):
 
 TEST CONFIGURATION:
 ------------------
-From tests/test_utils/config_override.py:
-  - TEST_N = 50 firms
-  - TEST_T = 400 time periods
-  - TEST_BURNIN = 300 months
-  - TEST_SEED = 12345
+From config.py:
+  - N = 50 firms
+  - T = 400 time periods
+  - BGN_BURNIN/KP14_BURNIN/GS21_BURNIN = 300 months
+  - TEST_SEED = 12345 (set in test script)
 
 EXPECTED RESULTS:
 ----------------
@@ -121,6 +121,29 @@ from config import N, T
 
 # Test configuration
 TEST_SEED = 12345
+EXPECTED_N = 50
+EXPECTED_T = 400
+
+
+def check_config_values():
+    """Check if N and T match expected test values."""
+    if N != EXPECTED_N or T != EXPECTED_T:
+        print("\n" + "!" * 70)
+        print("WARNING: Configuration mismatch detected!")
+        print("!" * 70)
+        print(f"Expected: N={EXPECTED_N}, T={EXPECTED_T}")
+        print(f"Current:  N={N}, T={T}")
+        print("\nTests are designed for N=50 and T=400.")
+        print("Running with different values may cause tests to fail or produce")
+        print("unexpected results.")
+        print()
+
+        response = input("Do you want to continue anyway? (y/n): ").strip().lower()
+        if response != 'y':
+            print("\nTest aborted by user.")
+            return False
+        print()
+    return True
 
 
 def prepare_panel_for_fama(panel, chars):
@@ -197,7 +220,7 @@ def test_fama_factors(model):
     # Step 1: Generate panel with current code via command line
     print("[1/5] Generating panel with current code via generate_panel.py...")
     test_dir = Path(__file__).parent
-    cmd = [sys.executable, str(test_dir / 'run_generate_panel.py'), model, str(TEST_PANEL_ID)]
+    cmd = [sys.executable, str(test_dir / 'test_utils' / 'run_generate_panel.py'), model, str(TEST_PANEL_ID)]
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
@@ -249,7 +272,119 @@ def test_fama_factors(model):
     print(f"      FF returns shape: {ff_returns_new.shape}")
     print(f"      FM returns shape: {fm_returns_new.shape}")
 
-    # Step 5: Compare original vs current factor returns
+    # Step 5: Verify portfolio statistics against manual computation
+    print(f"\n[STATS] Verifying portfolio statistics using original formulas...")
+    stats_passed = True
+
+    if 'fama_stats' not in fama_data:
+        print(f"      [FAIL] 'fama_stats' not found in pickle file")
+        stats_passed = False
+    elif 'model_stats' not in fama_data:
+        print(f"      [FAIL] 'model_stats' not found in pickle file")
+        stats_passed = False
+    else:
+        fama_stats = fama_data['fama_stats']
+        model_stats = fama_data['model_stats']
+
+        print(f"      Fama stats shape: {fama_stats.shape}")
+        if model_stats is not None:
+            print(f"      Model stats shape: {model_stats.shape}")
+        else:
+            print(f"      Model stats: None (no model factors available)")
+
+        # Load SDF moments to manually compute stats
+        moments_file = Path(DATA_DIR) / f'{panel_id}_moments.pkl'
+        if not moments_file.exists():
+            print(f"      [FAIL] Moments file not found: {moments_file}")
+            stats_passed = False
+        else:
+            with open(moments_file, 'rb') as f:
+                moments_data = pickle.load(f)
+
+            # Test a sample: verify stats for one specific month/alpha
+            test_month = fama_stats['month'].iloc[len(fama_stats)//2]  # Pick middle month
+            test_alpha = 0  # No shrinkage
+
+            print(f"      Testing month {test_month}, alpha={test_alpha}")
+
+            # Get stats from pickle
+            fama_row = fama_stats[(fama_stats['month'] == test_month) &
+                                  (fama_stats['alpha'] == test_alpha) &
+                                  (fama_stats['method'] == 'ff')].iloc[0]
+
+            # Get moments for this month
+            cond_var = moments_data['cond_var'][test_month]
+            rp = moments_data['rp'][test_month]
+            second_moment = moments_data['second_moment'][test_month]
+            second_moment_inv = moments_data['second_moment_inv'][test_month]
+
+            # Get panel data for this month
+            panel_data = panel.set_index(['month', 'firmid'])
+            data_month = panel_data.loc[test_month]
+
+            # Compute factor weights (same as original: fama.fama_french)
+            import fama_functions as fama_old
+            factor_weights = fama_old.fama_french(data_month[chars], chars=chars, mve=data_month['mve'])
+
+            # Get portfolio of factors (MV-efficient portfolio with alpha=0)
+            ff_returns = fama_data['ff_returns']
+            # Use past 360 months ending at test_month-1
+            hist_start = max(start, test_month - 360)
+            hist_returns = ff_returns.loc[hist_start:test_month-1]
+
+            # Ridge regression with alpha=0 (no shrinkage)
+            from sklearn.linear_model import Ridge
+            X = hist_returns.values
+            y = hist_returns.mean(axis=1).values
+            port_of_factors = Ridge(alpha=0, fit_intercept=False).fit(X, y).coef_
+
+            # Compute weights on stocks
+            weights_on_stocks = factor_weights @ port_of_factors
+
+            # Manually compute stats using original formulas
+            keep_this_month = data_month.index.to_numpy()
+            stock_cov = cond_var[keep_this_month, :][:, keep_this_month]
+            rp_month = rp[keep_this_month]
+            second_moment_month = second_moment[keep_this_month, :][:, keep_this_month]
+            second_moment_inv_month = second_moment_inv[keep_this_month, :][:, keep_this_month]
+
+            manual_stdev = np.sqrt(weights_on_stocks @ stock_cov @ weights_on_stocks)
+            manual_mean = weights_on_stocks @ rp_month
+            manual_xret = weights_on_stocks @ data_month['xret'].values
+            errs = rp_month - second_moment_month @ weights_on_stocks
+            manual_hjd = np.sqrt(errs @ second_moment_inv_month @ errs)
+
+            # Compare with pickle values
+            print(f"      Comparing computed vs. pickle values:")
+            try:
+                assert_close(manual_stdev, fama_row['stdev'], rtol=1e-10, atol=1e-12, name="stdev")
+                print(f"        [PASS] stdev matches")
+            except AssertionError as e:
+                print(f"        [FAIL] stdev: {e}")
+                stats_passed = False
+
+            try:
+                assert_close(manual_mean, fama_row['mean'], rtol=1e-10, atol=1e-12, name="mean")
+                print(f"        [PASS] mean matches")
+            except AssertionError as e:
+                print(f"        [FAIL] mean: {e}")
+                stats_passed = False
+
+            try:
+                assert_close(manual_xret, fama_row['xret'], rtol=1e-10, atol=1e-12, name="xret")
+                print(f"        [PASS] xret matches")
+            except AssertionError as e:
+                print(f"        [FAIL] xret: {e}")
+                stats_passed = False
+
+            try:
+                assert_close(manual_hjd, fama_row['hjd'], rtol=1e-10, atol=1e-12, name="hjd")
+                print(f"        [PASS] hjd matches")
+            except AssertionError as e:
+                print(f"        [FAIL] hjd: {e}")
+                stats_passed = False
+
+    # Step 6: Compare original vs current factor returns
     print(f"\n[COMPARE] Comparing original vs current factor returns...")
     all_passed = True
 
@@ -326,7 +461,10 @@ def test_fama_factors(model):
     else:
         print("\n  [FAIL] Factors are NOT identical")
 
-    # Step 6: Cleanup - delete all pickle files
+    # Combine results
+    overall_passed = all_passed and stats_passed
+
+    # Step 7: Cleanup - delete all pickle files
     print(f"\n[CLEANUP] Deleting pickle files...")
 
     files_to_delete = [panel_file, fama_file]
@@ -339,13 +477,21 @@ def test_fama_factors(model):
 
     print("\n" + "=" * 70)
     print(f"[DONE] Fama factor test complete for {model.upper()}")
+    if overall_passed:
+        print("[RESULT] ALL TESTS PASSED")
+    else:
+        print("[RESULT] SOME TESTS FAILED")
     print("=" * 70)
 
-    return all_passed
+    return overall_passed
 
 
 def main():
     """Main execution function."""
+    # Check configuration values first
+    if not check_config_values():
+        sys.exit(1)
+
     if len(sys.argv) < 2:
         print("Usage: python test_fama.py <model>")
         print("where <model> is one of: bgn, kp14, gs21")

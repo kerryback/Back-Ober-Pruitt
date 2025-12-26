@@ -82,14 +82,14 @@ CURRENT CODE (utils_kp14/):
 
 TEST CONFIGURATION:
 ------------------
-From tests/test_utils/config_override.py:
-  - TEST_N = 50 firms (vs 1000 in production)
-  - TEST_T = 400 time periods (vs 720 in production)
-  - TEST_BURNIN = 300 months (matches production KP14_BURNIN)
-  - TEST_SEED = 12345 (fixed for reproducibility)
+From config.py:
+  - N = 50 firms (configured in config.py)
+  - T = 400 time periods (configured in config.py)
+  - KP14_BURNIN = 300 months (configured in config.py)
+  - TEST_SEED = 12345 (set in test script)
 
 With T=400 and burnin=300:
-  - Total periods generated: T + TEST_BURNIN = 700
+  - Total periods generated: T + KP14_BURNIN = 700
   - Periods in final panel: 400 (months 300-699)
   - Total rows: N × T = 50 × 400 = 20,000
 
@@ -153,7 +153,7 @@ def test_kp14_panel_generation():
 
     # Run run_generate_panel.py wrapper (sets seed and calls generate_panel)
     test_dir = Path(__file__).parent
-    cmd = [sys.executable, str(test_dir / 'run_generate_panel.py'), 'kp14', str(TEST_PANEL_ID)]
+    cmd = [sys.executable, str(test_dir / 'test_utils' / 'run_generate_panel.py'), 'kp14', str(TEST_PANEL_ID)]
 
     result = subprocess.run(cmd, capture_output=True, text=True)
 

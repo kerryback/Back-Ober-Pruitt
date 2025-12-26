@@ -31,8 +31,9 @@ import sys
 import os
 import subprocess
 import time
+import pickle
 from datetime import datetime
-from config import DATA_DIR, N_DKKM_FEATURES_LIST, IPCA_K_VALUES
+from config import DATA_DIR, N_DKKM_FEATURES_LIST, IPCA_K_VALUES, KEEP_PANEL, KEEP_MOMENTS, KEEP_FACTOR_DETAILS
 
 
 def run_script(script_name, args, description):
@@ -52,6 +53,34 @@ def run_script(script_name, args, description):
         sys.exit(1)
 
     return elapsed
+
+
+def cleanup_factor_file(filepath, stats_key):
+    """
+    Remove all keys from factor pickle file except stats_key.
+
+    Args:
+        filepath: Path to pickle file
+        stats_key: Key to keep (e.g., 'fama_stats', 'dkkm_stats', 'ipca_stats')
+    """
+    if not os.path.exists(filepath):
+        return
+
+    # Read full pickle
+    with open(filepath, 'rb') as f:
+        data = pickle.load(f)
+
+    # Keep only stats key
+    if stats_key in data:
+        original_size = os.path.getsize(filepath) / (1024**2)  # MB
+        cleaned_data = {stats_key: data[stats_key]}
+
+        # Overwrite with cleaned data
+        with open(filepath, 'wb') as f:
+            pickle.dump(cleaned_data, f)
+
+        new_size = os.path.getsize(filepath) / (1024**2)  # MB
+        print(f"[CLEANUP] Reduced {os.path.basename(filepath)}: {original_size:.2f} MB -> {new_size:.2f} MB")
 
 
 def run_workflow_for_index(model, panel_id):
@@ -86,6 +115,11 @@ def run_workflow_for_index(model, panel_id):
         "STEP 3: Computing Fama-French and Fama-MacBeth factors"
     )
 
+    # Clean up Fama file if requested
+    if not KEEP_FACTOR_DETAILS:
+        fama_file = os.path.join(DATA_DIR, f"{full_panel_id}_fama.pkl")
+        cleanup_factor_file(fama_file, 'fama_stats')
+
     # Step 4: Compute DKKM factors for each feature count
     timings['run_dkkm'] = {}
     for i, nfeatures in enumerate(N_DKKM_FEATURES_LIST, 1):
@@ -94,6 +128,11 @@ def run_workflow_for_index(model, panel_id):
             [full_panel_id, str(nfeatures)],
             f"STEP 4.{i}: Computing DKKM factors (nfeatures={nfeatures})"
         )
+
+        # Clean up DKKM file if requested
+        if not KEEP_FACTOR_DETAILS:
+            dkkm_file = os.path.join(DATA_DIR, f"{full_panel_id}_dkkm_{nfeatures}.pkl")
+            cleanup_factor_file(dkkm_file, 'dkkm_stats')
 
     # Step 5: Compute IPCA factors for each K value
     timings['run_ipca'] = {}
@@ -104,18 +143,29 @@ def run_workflow_for_index(model, panel_id):
             f"STEP 5.{i}: Computing IPCA factors (K={K})"
         )
 
-    # Step 6: Clean up moments and panel files to save disk space
-    moments_file = os.path.join(DATA_DIR, f"{full_panel_id}_moments.pkl")
-    if os.path.exists(moments_file):
-        file_size = os.path.getsize(moments_file) / (1024**3)  # Size in GB
-        os.remove(moments_file)
-        print(f"\n[CLEANUP] Deleted moments file ({file_size:.2f} GB): {moments_file}")
+        # Clean up IPCA file if requested
+        if not KEEP_FACTOR_DETAILS:
+            ipca_file = os.path.join(DATA_DIR, f"{full_panel_id}_ipca_{K}.pkl")
+            cleanup_factor_file(ipca_file, 'ipca_stats')
 
-    panel_file = os.path.join(DATA_DIR, f"{full_panel_id}_panel.pkl")
-    if os.path.exists(panel_file):
-        file_size = os.path.getsize(panel_file) / (1024**3)  # Size in GB
-        os.remove(panel_file)
-        print(f"[CLEANUP] Deleted panel file ({file_size:.2f} GB): {panel_file}")
+    # Step 6: Clean up moments and panel files to save disk space
+    if not KEEP_MOMENTS:
+        moments_file = os.path.join(DATA_DIR, f"{full_panel_id}_moments.pkl")
+        if os.path.exists(moments_file):
+            file_size = os.path.getsize(moments_file) / (1024**3)  # Size in GB
+            os.remove(moments_file)
+            print(f"\n[CLEANUP] Deleted moments file ({file_size:.2f} GB): {moments_file}")
+    else:
+        print(f"\n[KEEP] Keeping moments file (KEEP_MOMENTS=True)")
+
+    if not KEEP_PANEL:
+        panel_file = os.path.join(DATA_DIR, f"{full_panel_id}_panel.pkl")
+        if os.path.exists(panel_file):
+            file_size = os.path.getsize(panel_file) / (1024**3)  # Size in GB
+            os.remove(panel_file)
+            print(f"[CLEANUP] Deleted panel file ({file_size:.2f} GB): {panel_file}")
+    else:
+        print(f"[KEEP] Keeping panel file (KEEP_PANEL=True)")
 
     # Print summary for this index
     total_time = sum([timings['generate_panel'], timings['calculate_moments'], timings['run_fama']] +
@@ -219,17 +269,19 @@ def main():
                 failed_indices.append(i)
 
                 # Clean up moments and panel files for failed panel (if they exist)
-                moments_file = os.path.join(DATA_DIR, f"{model}_{i}_moments.pkl")
-                if os.path.exists(moments_file):
-                    file_size = os.path.getsize(moments_file) / (1024**3)  # Size in GB
-                    os.remove(moments_file)
-                    print(f"\n[CLEANUP] Deleted moments file for failed panel ({file_size:.2f} GB): {moments_file}")
+                if not KEEP_MOMENTS:
+                    moments_file = os.path.join(DATA_DIR, f"{model}_{i}_moments.pkl")
+                    if os.path.exists(moments_file):
+                        file_size = os.path.getsize(moments_file) / (1024**3)  # Size in GB
+                        os.remove(moments_file)
+                        print(f"\n[CLEANUP] Deleted moments file for failed panel ({file_size:.2f} GB): {moments_file}")
 
-                panel_file = os.path.join(DATA_DIR, f"{model}_{i}_panel.pkl")
-                if os.path.exists(panel_file):
-                    file_size = os.path.getsize(panel_file) / (1024**3)  # Size in GB
-                    os.remove(panel_file)
-                    print(f"[CLEANUP] Deleted panel file for failed panel ({file_size:.2f} GB): {panel_file}")
+                if not KEEP_PANEL:
+                    panel_file = os.path.join(DATA_DIR, f"{model}_{i}_panel.pkl")
+                    if os.path.exists(panel_file):
+                        file_size = os.path.getsize(panel_file) / (1024**3)  # Size in GB
+                        os.remove(panel_file)
+                        print(f"[CLEANUP] Deleted panel file for failed panel ({file_size:.2f} GB): {panel_file}")
 
                 print(f"\n{'='*70}")
                 print(f"ERROR: Workflow failed for {model}_{i}")
@@ -263,8 +315,10 @@ def main():
             else:
                 full_panel_id = f"{model}_{i}"
                 print(f"\n  Index {i} ({full_panel_id}):")
-                print(f"    - Panel data: {full_panel_id}_panel.pkl (deleted after use)")
-                print(f"    - SDF moments: {full_panel_id}_moments.pkl (deleted after use)")
+                panel_status = "kept" if KEEP_PANEL else "deleted after use"
+                moments_status = "kept" if KEEP_MOMENTS else "deleted after use"
+                print(f"    - Panel data: {full_panel_id}_panel.pkl ({panel_status})")
+                print(f"    - SDF moments: {full_panel_id}_moments.pkl ({moments_status})")
                 print(f"    - Fama factors: {full_panel_id}_fama.pkl")
                 for nfeatures in N_DKKM_FEATURES_LIST:
                     print(f"    - DKKM (n={nfeatures}): {full_panel_id}_dkkm_{nfeatures}.pkl")

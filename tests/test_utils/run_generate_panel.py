@@ -2,28 +2,33 @@
 Wrapper to run panel generation with a fixed seed for testing.
 
 This script calls the panel generation functions directly with TEST_SEED
-to ensure reproducibility.
+to ensure reproducibility for regression testing.
 
 Usage:
-    python run_generate_panel.py bgn 999
+    python run_generate_panel.py <model> <identifier>
+
+Examples:
+    python run_generate_panel.py bgn 0
+    python run_generate_panel.py kp14 999
 """
 
 import sys
 import os
 import numpy as np
-import pickle
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-sys.path.insert(0, str(Path(__file__).parent / 'test_utils'))
 
-from test_utils.config_override import TEST_SEED
+# Fixed seed for reproducibility in testing
+TEST_SEED = 12345
 
 
 def main():
     if len(sys.argv) < 3:
         print("Usage: python run_generate_panel.py <model> <identifier>")
+        print("  Models: bgn, kp14, gs21")
+        print("  Example: python run_generate_panel.py bgn 0")
         sys.exit(1)
 
     model = sys.argv[1].lower()

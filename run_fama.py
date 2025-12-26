@@ -100,30 +100,54 @@ def main():
     # Compute Fama factors
     ff_rets, fm_rets = compute_fama_factors(panel, start, end, CONFIG, CHARS)
 
-    # Extract model factors from arrays data
+    # Extract model factors from arr_tuple
     print(f"\n{'-'*70}")
-    print("Extracting model factors from arrays data...")
+    print("Extracting model factors from array data...")
 
     model_premia = {}
-    if 'arrays' in arrays_data:
-        arrays = arrays_data['arrays']
 
-        # Extract Taylor and Projection factor returns
-        if 'taylor' in FACTOR_KEYS.get(MODEL, []) or 'f_1_' in arrays:
-            taylor_keys = [k for k in arrays.keys() if k.startswith('f_1_')]
-            if taylor_keys:
-                taylor_data = {k.replace('f_1_', ''): arrays[k] for k in taylor_keys}
-                model_premia['taylor'] = pd.DataFrame(taylor_data, index=range(start, end + 1))
-                model_premia['taylor'].index.name = 'month'
-                print(f"  [OK] Taylor factors: {model_premia['taylor'].shape}")
+    # Model factors are computed from arr_tuple (not stored in panel to save memory)
+    # arr_tuple contains: r, mu, xi, sigmaj, chi, beta, corr_zr, eret, ret, P, corr_zr, ...
+    if 'arr_tuple' in arrays_data and MODEL.lower() == 'bgn':
+        arr_tuple = arrays_data['arr_tuple']
 
-        if 'proj' in FACTOR_KEYS.get(MODEL, []) or 'f_2_' in arrays:
-            proj_keys = [k for k in arrays.keys() if k.startswith('f_2_')]
-            if proj_keys:
-                proj_data = {k.replace('f_2_', ''): arrays[k] for k in proj_keys}
-                model_premia['proj'] = pd.DataFrame(proj_data, index=range(start, end + 1))
-                model_premia['proj'].index.name = 'month'
-                print(f"  [OK] Projection factors: {model_premia['proj'].shape}")
+        # Extract needed arrays: r[0], mu[1], xi[2], corr_zr[10]
+        r_arr = arr_tuple[0]
+        mu = arr_tuple[1]
+        xi = arr_tuple[2]
+        corr_zr = arr_tuple[10]
+
+        # Import sigma_z from BGN vasicek module
+        from utils_bgn.vasicek import sigma_z
+
+        # Compute factor returns using original formula
+        # f_mu_true = sigma_z * sqrt(1 - corr_zr^2) + mu
+        # f_xi_true = sigma_z * corr_zr + xi
+        f_mu_true = sigma_z * np.sqrt(1 - corr_zr**2) + mu[1:]  # mu[1:] to match r[1:-1]
+        f_xi_true = sigma_z * corr_zr + xi[1:]
+
+        # Create DataFrame with factor returns
+        # Note: months go from 1 to T (matching panel.month values after burnin removal)
+        T = len(f_mu_true)
+        month_range = range(1, T + 1)
+
+        factor_data = pd.DataFrame({
+            'mu': f_mu_true,
+            'xi': f_xi_true
+        }, index=month_range)
+        factor_data.index.name = 'month'
+
+        # Filter to current date range (after burnin removal in prepare_panel)
+        factor_data = factor_data.loc[start:end]
+
+        # Both Taylor and Projection use the same true factors
+        model_premia['taylor'] = factor_data.copy()
+        model_premia['proj'] = factor_data.copy()
+
+        print(f"  [OK] Taylor factors: {model_premia['taylor'].shape}")
+        print(f"  [OK] Projection factors: {model_premia['proj'].shape}")
+    else:
+        print(f"  [INFO] No model factors computed (only available for BGN model)")
 
     # Compute portfolio statistics
     print(f"\n{'-'*70}")

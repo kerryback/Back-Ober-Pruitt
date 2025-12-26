@@ -121,11 +121,11 @@ compute_summary_stats(data_dict, name="")
 print_comparison_summary(stats1, stats2)
 ```
 
-**config_override.py** - Small test parameters:
-- N=50 firms (vs 1000 production)
-- T=400 periods (vs 720 production)
-- Burnin=100 (vs 300 production)
-- Fixed seed=12345 for reproducibility
+**Test Configuration** - Uses config.py values:
+- N=50 firms (configured in config.py)
+- T=400 periods (configured in config.py)
+- Burnin=300 months (BGN_BURNIN/KP14_BURNIN/GS21_BURNIN in config.py)
+- Fixed seed=12345 for reproducibility (set in each test script)
 
 ### Recommended Numerical Tolerances
 

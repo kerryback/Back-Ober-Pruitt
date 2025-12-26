@@ -198,10 +198,8 @@ def create_panel(N, T, arr_tuple):
     r, mu, xi, sigmaj, chi, beta, corr_zj, eret, ret, P, corr_zr, book, op_cash_flow, loadings_mu_taylor, loadings_xi_taylor, loadings_mu_proj, loadings_xi_proj = arr_tuple
     r = pd.DataFrame(
         {
-            "month": range(1, T), 
-            "rf": r[1:-1], 
-            "f_mu_true": sigma_z*np.sqrt(1 - corr_zr**2) + mu[1:], 
-            "f_xi_true": sigma_z*corr_zr + xi[1:]
+            "month": range(1, T),
+            "rf": r[1:-1]
         }
     )
 

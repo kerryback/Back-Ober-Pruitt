@@ -126,7 +126,7 @@ def compute_fama_portfolio_stats(
     start_month: int,
     end_month: int,
     alpha_lst: list = None,
-    burnin: int = 200
+    burnin: int = None
 ) -> pd.DataFrame:
     """
     Compute portfolio statistics for Fama factors (FF and FM).
@@ -143,7 +143,7 @@ def compute_fama_portfolio_stats(
         start_month: First month (must be >= burnin + 360)
         end_month: Last month
         alpha_lst: List of ridge penalties to evaluate (default: [0])
-        burnin: Burn-in period (default: 200)
+        burnin: Burn-in period (must be from config.BGN_BURNIN/KP14_BURNIN/GS21_BURNIN)
 
     Returns:
         DataFrame with columns: ['month', 'method', 'alpha', 'stdev', 'mean', 'xret', 'hjd']
@@ -245,7 +245,7 @@ def compute_dkkm_portfolio_stats(
     include_mkt: bool = False,
     mkt_returns: pd.DataFrame = None,
     matrix_idx: int = 0,
-    burnin: int = 200
+    burnin: int = None
 ) -> pd.DataFrame:
     """
     Compute portfolio statistics for DKKM factors.
@@ -265,7 +265,7 @@ def compute_dkkm_portfolio_stats(
         include_mkt: Whether market factor is included
         mkt_returns: Market factor returns (if include_mkt=True)
         matrix_idx: Random matrix index (for tracking)
-        burnin: Burn-in period (default: 200)
+        burnin: Burn-in period (must be from config.BGN_BURNIN/KP14_BURNIN/GS21_BURNIN)
 
     Returns:
         DataFrame with columns: ['month', 'matrix', 'alpha', 'include_mkt', 'stdev', 'mean', 'xret', 'hjd']
@@ -356,6 +356,7 @@ def compute_dkkm_portfolio_stats(
 
 def compute_ipca_portfolio_stats(
     ipca_returns: pd.DataFrame,
+    ipca_weights: np.ndarray,
     panel: pd.DataFrame,
     panel_id: str,
     model: str,
@@ -366,7 +367,7 @@ def compute_ipca_portfolio_stats(
     alpha_lst: list = None,
     include_mkt: bool = False,
     mkt_returns: pd.DataFrame = None,
-    burnin: int = 200
+    burnin: int = None
 ) -> pd.DataFrame:
     """
     Compute portfolio statistics for IPCA factors.
@@ -375,6 +376,7 @@ def compute_ipca_portfolio_stats(
 
     Args:
         ipca_returns: IPCA factor returns DataFrame (months x K factors)
+        ipca_weights: IPCA factor loadings array (K, N, n_windows)
         panel: Panel data
         panel_id: Panel identifier (e.g., 'bgn_0')
         model: Model name ('bgn', 'kp14', 'gs21')
@@ -385,7 +387,7 @@ def compute_ipca_portfolio_stats(
         alpha_lst: List of ridge penalties (default: [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1])
         include_mkt: Whether to include market factor
         mkt_returns: Market factor returns (if include_mkt=True)
-        burnin: Burn-in period (default: 200)
+        burnin: Burn-in period (must be from config.BGN_BURNIN/KP14_BURNIN/GS21_BURNIN)
 
     Returns:
         DataFrame with columns: ['month', 'K', 'alpha', 'include_mkt', 'stdev', 'mean', 'xret', 'hjd']
@@ -464,44 +466,56 @@ def compute_ipca_portfolio_stats(
                     X, y, np.array([360 * nfeatures * alpha])
                 )[:, 0]
 
-            # IPCA loadings are NOT stored month-by-month in panel
-            # Instead, they're pre-computed and stored in ipca_weights array
-            # For portfolio stats, we need to reconstruct loadings from characteristics
+            # Get IPCA loadings for this month
+            # ipca_weights shape: (K, N, n_windows)
+            # IPCA returns start at start_month + 360
+            window_idx = month - (start_month + 360)
 
-            # For now, we'll use a simplified approach:
-            # Portfolio weights are factor_portfolio' @ factor_returns for each stock
-            # This requires having the IPCA loadings for each stock at this month
+            if window_idx < 0 or window_idx >= ipca_weights.shape[2]:
+                # Skip months outside valid window range
+                continue
 
-            # Since we don't have access to ipca_weights here, we'll compute
-            # portfolio return directly from factor returns
-            # This is a limitation - ideally we'd pass ipca_weights to this function
+            # Extract loadings for this window: (K, N) -> transpose to (N, K)
+            loadings = ipca_weights[:, :, window_idx].T  # (N, K)
 
-            # Placeholder: Use equal weights (THIS IS TEMPORARY)
-            # Proper implementation would use: loadings @ port_of_factors
+            # Get current month data
             data_month = panel.loc[month].copy()
             firm_ids = data_month.index.to_numpy()
 
-            # For now, compute portfolio return using factor returns only
-            # This matches the IPCA methodology where portfolio = loadings @ factor_portfolio
-            factor_ret = ipca_returns.loc[month].to_numpy()
-            if include_mkt and mkt_returns is not None:
-                mkt_ret = mkt_returns.loc[month, 'mkt_rf'] if month in mkt_returns.index else 0
-                factor_ret = np.append(factor_ret, mkt_ret)
+            # Portfolio weights on IPCA factors (use only first K elements if mkt included)
+            port_of_ipca_factors = port_of_factors[:K] if include_mkt else port_of_factors
 
-            # Portfolio return on factors
-            port_return_factors = port_of_factors @ factor_ret
+            # Portfolio weights on stocks (partial - only for firms that exist)
+            # Extract loadings only for firms that exist at this month
+            loadings_partial = loadings[firm_ids, :]  # (n_firms_t, K)
+            weights_partial = loadings_partial @ port_of_ipca_factors  # (n_firms_t,)
 
-            # TEMPORARY: Use simplified statistics
-            # Proper implementation requires ipca_weights array
+            # Create full N-dimensional weight vector (for all stocks in SDF)
+            weights_on_stocks = np.zeros(N)
+            weights_on_stocks[firm_ids] = weights_partial
+
+            # Compute statistics using SDF moments
+            stdev = np.sqrt(weights_on_stocks @ cond_var @ weights_on_stocks)
+            mean = weights_on_stocks @ rp
+
+            # Realized return: only for available stocks
+            xret_full = np.zeros(N)
+            xret_full[firm_ids] = data_month['xret'].values
+            xret = weights_on_stocks @ xret_full
+
+            # Hansen-Jagannathan distance
+            errs = rp - second_moment @ weights_on_stocks
+            hjd = np.sqrt(errs @ second_moment_inv @ errs)
+
             results_list.append({
                 'month': month,
                 'K': K,
                 'alpha': alpha,
                 'include_mkt': include_mkt,
-                'stdev': np.nan,  # Would need loadings @ port_of_factors
-                'mean': port_return_factors,  # Simplified
-                'xret': port_return_factors,  # Simplified
-                'hjd': np.nan  # Would need loadings @ port_of_factors
+                'stdev': stdev,
+                'mean': mean,
+                'xret': xret,
+                'hjd': hjd
             })
 
     return pd.DataFrame(results_list)

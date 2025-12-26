@@ -1,4 +1,8 @@
-burnin = 300  # Updated to match current code's KP14_BURNIN
+# Import burnin from main config.py
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from config import KP14_BURNIN as burnin
 dt = 1/12
 
 mu_x, mu_z, sigma_x, sigma_z = 0.01, 0.005, 0.13, 0.035

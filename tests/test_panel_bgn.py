@@ -40,8 +40,7 @@ ORIGINAL CODE (tests/original_code/):
 
      - create_panel(N, T, arrays): Transform arrays into panel DataFrame
        Returns: DataFrame with columns [month, firmid, mve, xret, A_1_taylor,
-                A_2_taylor, A_1_proj, A_2_proj, roe, bm, mom, agr, f_mu_true,
-                f_xi_true, rf_stand]
+                A_2_taylor, A_1_proj, A_2_proj, roe, bm, mom, agr, rf_stand, size]
        Filters to keep only months > burnin-1 (i.e., months 300-699 for T=700, burnin=300)
 
   3. Execution:
@@ -72,14 +71,14 @@ CURRENT CODE (utils_bgn/):
 
 TEST CONFIGURATION:
 ------------------
-From tests/test_utils/config_override.py:
-  - TEST_N = 50 firms (vs 1000 in production)
-  - TEST_T = 400 time periods (vs 720 in production)
-  - TEST_BURNIN = 300 months (matches production BGN_BURNIN)
-  - TEST_SEED = 12345 (fixed for reproducibility)
+From config.py:
+  - N = 50 firms (configured in config.py)
+  - T = 400 time periods (configured in config.py)
+  - BGN_BURNIN = 300 months (configured in config.py)
+  - TEST_SEED = 12345 (set in test script)
 
 With T=400 and burnin=300:
-  - Total periods generated: T + TEST_BURNIN = 700
+  - Total periods generated: T + BGN_BURNIN = 700
   - Periods in final panel: 400 (months 300-699)
   - Total rows: N × T = 50 × 400 = 20,000
 
@@ -143,7 +142,7 @@ def test_bgn_panel_generation():
 
     # Run run_generate_panel.py wrapper (sets seed and calls generate_panel)
     test_dir = Path(__file__).parent
-    cmd = [sys.executable, str(test_dir / 'run_generate_panel.py'), 'bgn', str(TEST_PANEL_ID)]
+    cmd = [sys.executable, str(test_dir / 'test_utils' / 'run_generate_panel.py'), 'bgn', str(TEST_PANEL_ID)]
 
     result = subprocess.run(cmd, capture_output=True, text=True)
 

@@ -4,13 +4,13 @@ This document describes the regression testing framework for validating that the
 
 ## Overview
 
-The regression tests compare outputs from the refactored code (current directory) against the original code (parent directory `../`) for all three models (BGN, KP14, GS21) across all 5 workflow steps.
+The regression tests compare outputs from the refactored code (`utils_bgn/`, `utils_kp14/`, `utils_gs21/`) against the original code (`tests/original_code/`) for all three models (BGN, KP14, GS21).
 
 **Key Features:**
 - Deterministic execution with fixed random seeds
-- Small test cases for fast execution
+- Small test cases for fast execution (N=50, T=400)
 - Appropriate numerical tolerances for each workflow step
-- Comprehensive coverage of all models and steps
+- Comprehensive coverage of all models
 - Informative error messages with detailed diagnostics
 
 ## Test Structure
@@ -21,13 +21,28 @@ The regression tests compare outputs from the refactored code (current directory
 tests/
 ├── test_utils/
 │   ├── __init__.py           # Package initialization
-│   ├── comparison.py         # Comparison utilities
-│   └── config_override.py    # Test configuration
-├── test_regression_bgn.py    # BGN model regression tests
-├── test_regression_kp14.py   # KP14 model regression tests
-├── test_regression_gs21.py   # GS21 model regression tests
+│   └── comparison.py         # Comparison utilities
+├── original_code/            # Original code to compare against
+│   ├── panel_functions.py    # BGN panel generation (original)
+│   ├── panel_functions_kp14.py
+│   ├── panel_functions_gs21.py
+│   ├── sdf_compute.py        # BGN SDF calculations (original)
+│   ├── sdf_compute_kp14.py
+│   ├── sdf_compute_gs21.py
+│   ├── Jstar.csv             # BGN data file
+│   ├── G_func.csv            # KP14 data file
+│   ├── integ_results.npz     # KP14 data file
+│   └── GS21_solfiles/        # GS21 data files
+├── test_panel_bgn.py         # BGN panel generation test
+├── test_panel_kp14.py        # KP14 panel generation test
+├── test_panel_gs21.py        # GS21 panel generation test
+├── test_moments_bgn.py       # BGN moment calculation test
+├── test_moments_kp14.py      # KP14 moment calculation test
+├── test_moments_gs21.py      # GS21 moment calculation test
+├── test_fama.py              # Fama factor regression test
 ├── test_randomized_ridge.py  # Randomized SVD validation
-└── run_all_regression_tests.py  # Master test runner
+├── run_generate_panel.py     # Helper script for panel generation
+└── TESTING.md                # This file
 ```
 
 ### Test Utilities
@@ -39,80 +54,87 @@ tests/
 - `compute_summary_stats()` - Compute summary statistics for data dictionary
 - `print_comparison_summary()` - Print comparison summary
 
-**config_override.py** - Small parameter values for fast testing:
+## Test Configuration
+
+All tests use configuration values from `config.py`:
 ```python
-TEST_N = 50              # Number of firms (vs 1000 production)
-TEST_T = 200             # Time periods (vs 720 production)
-TEST_BURNIN = 100        # Burnin period (vs 300 production)
-TEST_SEED = 12345        # Fixed random seed
-TEST_PANEL_ID = 999      # Test panel ID
-TEST_DKKM_FEATURES = [6, 36]     # Subset for speed
-TEST_IPCA_K_VALUES = [1, 2]      # Subset for speed
-TEST_N_JOBS = 2          # Parallel jobs (vs 10 production)
+N = 50                   # Number of firms (configured in config.py)
+T = 400                  # Time periods (configured in config.py)
+BGN_BURNIN = 300        # Burnin period for BGN
+KP14_BURNIN = 300       # Burnin period for KP14
+GS21_BURNIN = 300       # Burnin period for GS21
+TEST_SEED = 12345       # Fixed random seed (set in each test script)
 ```
 
 ## Test Execution
 
-### Running All Tests
+### Panel Generation Tests
+
+Test that refactored panel generation produces identical results to original code.
 
 ```bash
 cd tests
-python run_all_regression_tests.py
+
+# Run individual panel tests
+python test_panel_bgn.py
+python test_panel_kp14.py
+python test_panel_gs21.py
 ```
 
-This runs all three model regression tests and provides a comprehensive summary.
-
-### Running Specific Models
-
-```bash
-# Run only BGN tests
-python run_all_regression_tests.py bgn
-
-# Run KP14 and GS21 tests
-python run_all_regression_tests.py kp14 gs21
-```
-
-### Running Individual Test Suites
-
-```bash
-# Run BGN regression tests
-python test_regression_bgn.py
-
-# Run KP14 regression tests
-python test_regression_kp14.py
-
-# Run GS21 regression tests
-python test_regression_gs21.py
-```
-
-## Test Coverage
-
-Each model regression test validates all 5 workflow steps:
-
-### 1. Panel Generation (test_01_panel_generation)
-- Runs: `generate_panel.py` (refactored) vs `generate_panel_{model}.py` (original)
-- Compares: Panel DataFrame and all arrays (A_taylor, A_proj, f_taylor, f_proj)
+**What they test:**
+- Generate panels with both current and original code using same random seed
+- Compare all panel DataFrame columns
+- Compare all arrays (A_taylor, A_proj, f_taylor, f_proj, K matrix for KP14, etc.)
 - Tolerance: rtol=1e-14, atol=1e-15 (exact match expected)
 
-### 2. Moment Calculation (test_02_moments)
-- Runs: `calculate_moments.py` (refactored) vs `calculate_moments_{model}.py` (original)
-- Compares: rp, cond_var, second_moment, second_moment_inv
-- Tolerance: rtol=1e-10 for matrix inversions, rtol=1e-12 otherwise
+**Note:** BGN, KP14, and GS21 tests may report NaN handling improvements where refactored code sets `roe=0` and `agr=0` when book value is 0, instead of NaN. This is an expected improvement.
 
-### 3. Fama Factors (test_03_fama)
-- Runs: `run_fama.py` on both versions
-- Compares: All factor arrays in output
-- Tolerance: rtol=1e-10, atol=1e-12
+### Moment Calculation Tests
 
-### 4. DKKM Factors (test_04_dkkm)
-- Runs: `run_dkkm.py` for each n_features in TEST_DKKM_FEATURES
-- Compares: All factor arrays for each feature count
-- Tolerance: rtol=1e-10, atol=1e-12
+Test that refactored SDF moment calculations produce identical results to original code.
 
-### 5. IPCA Factors (test_05_ipca)
-- Runs: `run_ipca.py` for each K in TEST_IPCA_K_VALUES
-- Compares: All arrays, with sign-invariant comparison for factors
-- Tolerance: rtol=1e-6, atol=1e-8 (optimization-based method)
+```bash
+cd tests
+
+# Run individual moment tests
+python test_moments_bgn.py
+python test_moments_kp14.py
+python test_moments_gs21.py
+```
+
+**What they test:**
+1. Generate panel via subprocess: `run_generate_panel.py <model> <panel_id>`
+2. Calculate moments via subprocess: `calculate_moments.py <model>_<panel_id>`
+3. Read pickled moments (current code output)
+4. Compute moments with original code (in-process import)
+5. Compare rp (risk premia), cond_var (conditional variance), max_sr (maximum Sharpe ratio)
+6. Cleanup: Delete panel and moments pickle files
+- Tolerance: rtol=1e-12, atol=1e-14
+
+**Execution pattern:**
+- **Current code**: Runs via subprocess from terminal (`calculate_moments.py`)
+- **Original code**: Imported directly and called in-process
+
+### Fama Factor Tests
+
+Test Fama-French and Fama-MacBeth factor calculations.
+
+```bash
+cd tests
+
+# Run Fama tests for each model
+python test_fama.py bgn
+python test_fama.py kp14
+python test_fama.py gs21
+```
+
+**What they test:**
+1. Generate panel via subprocess
+2. Compute Fama factors with original code (in-process)
+3. Compute Fama factors with current code via subprocess (`run_fama.py`)
+4. Compare factor returns
+5. Cleanup: Delete pickle files
+- Tolerance: rtol=1e-14, atol=1e-15
 
 ## Numerical Tolerances
 
@@ -121,53 +143,20 @@ Different workflow steps require different tolerances:
 | Step | Relative Tol | Absolute Tol | Reason |
 |------|-------------|--------------|--------|
 | Panel Generation | 1e-14 | 1e-15 | Direct calculations, exact match expected |
-| Moments | 1e-10 | 1e-9 | Matrix inversions accumulate error |
-| Fama Factors | 1e-10 | 1e-12 | Matrix operations |
-| DKKM Factors | 1e-10 | 1e-12 | Ridge regression with randomized SVD |
-| IPCA Factors | 1e-6 | 1e-8 | Stiefel manifold optimization |
-
-## Special Considerations
-
-### IPCA Sign Indeterminacy
-
-IPCA factors are identified only up to sign (±1). The comparison function `assert_factors_equal_up_to_sign()` checks if factors match either as-is or with sign flipped:
-
-```python
-# Check if equal or negated
-positive_match = np.allclose(f1, f2, rtol=rtol, atol=atol)
-negative_match = np.allclose(f1, -f2, rtol=rtol, atol=atol)
-
-if not (positive_match or negative_match):
-    raise AssertionError(...)
-```
-
-### Random Seed Handling
-
-All tests use `TEST_SEED = 12345` for reproducibility. This ensures:
-- Panel generation produces identical data
-- Random Fourier Features (DKKM) are deterministic
-- IPCA random restarts are reproducible
-
-### Parallel Processing
-
-Tests use `TEST_N_JOBS = 2` instead of production value (10) to:
-- Reduce overhead for small test cases
-- Ensure deterministic ordering
-- Make tests faster
+| Moments | 1e-12 | 1e-14 | Matrix operations accumulate small errors |
+| Fama Factors | 1e-14 | 1e-15 | Direct calculations |
 
 ## Expected Test Duration
 
-With test configuration (N=50, T=200, BURNIN=100):
+With test configuration (N=50, T=400, BURNIN=300):
 
 | Test | Approximate Duration |
 |------|---------------------|
-| Panel Generation | ~5 seconds |
-| Moment Calculation | ~10 seconds |
-| Fama Factors | ~2 seconds |
-| DKKM Factors (2 configs) | ~15 seconds |
-| IPCA Factors (2 K values) | ~30 seconds |
-| **Total per model** | **~60 seconds** |
-| **All 3 models** | **~3 minutes** |
+| Panel Generation (each model) | ~5 seconds |
+| Moment Calculation (each model) | ~30 seconds |
+| Fama Factors (each model) | ~5 seconds |
+| **Total per model** | **~40 seconds** |
+| **All 3 models** | **~2 minutes** |
 
 ## Interpreting Test Results
 
@@ -175,29 +164,30 @@ With test configuration (N=50, T=200, BURNIN=100):
 
 ```
 ======================================================================
-TEST 1: Panel Generation
+BGN Panel Generation
 ======================================================================
+N=50, T=400, Burnin=300, Seed=12345
 
-[1/2] Running refactored code...
-[OK] Refactored code completed
+[1/4] Generating panel with current code...
+      Panel shape: (20000, 12)
 
-[2/2] Running original code...
-[OK] Original code completed
+[2/4] Generating panel with original code...
+      Panel shape: (20000, 12)
 
-[COMPARE] Loading results...
-  Refactored keys: ['panel', 'A_1_taylor', 'A_2_taylor', ...]
-  Original keys: ['panel', 'A_1_taylor', 'A_2_taylor', ...]
-
-[COMPARE] Comparing panel DataFrame...
-  [PASS] Panel DataFrames match
-
-[COMPARE] Comparing arrays...
-  [PASS] A_1_taylor matches
-  [PASS] A_2_taylor matches
+[3/4] Comparing panels for numerical identity...
+  [PASS] panel[month]
+  [PASS] panel[firmid]
+  [PASS] panel[mve]
+  ...
+  [PASS] arrays[0]
+  [PASS] arrays[1]
   ...
 
+[4/4] Saving panel and arrays to outputs/bgn_test_panel.pkl...
+      Saved successfully
+
 ======================================================================
-[PASS] Panel generation test passed
+[DONE] BGN panel generation complete
 ======================================================================
 ```
 
@@ -206,39 +196,78 @@ TEST 1: Panel Generation
 When a test fails, you'll see detailed diagnostics:
 
 ```
-AssertionError: Column 'ret' mismatch:
-  Max absolute diff: 1.23e-09
-  Max relative diff: 4.56e-08
-  Tolerance: rtol=1e-14, atol=1e-15
+  [FAIL] panel[xret]: Max diff=1.23e-09, rtol=1.23e-08, atol=1e-15
+         Expected: rtol=1e-14, atol=1e-15
 ```
 
 This indicates:
 - Which array/column failed
-- Maximum absolute and relative differences
+- Maximum difference and relative/absolute tolerances
 - Expected tolerances
+
+### NaN Handling Notes
+
+Some tests report improved NaN handling:
+
+```
+  [FAIL] panel[roe]: NaN locations differ (expected improvement)
+         New code: 0 NaNs, Original code: 217 NaNs
+```
+
+This is **expected** - the refactored code sets `roe=0` and `agr=0` when book value is 0, instead of propagating NaN. The test will still show "[NOTE] Arrays are identical; panel differences are only NaN handling (expected improvement)".
+
+## Workflow Comparison
+
+### Original Code (tests/original_code/)
+- **Implementation**: Import directly and call functions in-process
+- **Data files**: Uses relative paths (Jstar.csv, G_func.csv, etc.)
+- **Execution**: Must `os.chdir()` to original_code/ before importing
+
+### Current Code (utils_bgn/, utils_kp14/, utils_gs21/)
+- **Implementation**: Run from terminal via subprocess
+- **Data files**: Uses absolute paths via config.DATA_DIR
+- **Execution**: Call via subprocess (`generate_panel.py`, `calculate_moments.py`, etc.)
+
+## Directory Navigation Pattern
+
+Tests that import original code use this pattern:
+
+```python
+# Change to original_code directory so data files can be found
+original_cwd = os.getcwd()
+original_code_dir = Path(__file__).parent / 'original_code'
+os.chdir(original_code_dir)
+
+# Import original code
+import panel_functions as panel_old
+
+# Change back
+os.chdir(original_cwd)
+```
+
+This is necessary because original code uses relative paths like `pd.read_csv('Jstar.csv')` which look in the current working directory.
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **Test fails with "file not found"**
-   - Ensure original code exists in parent directory (`../`)
-   - Verify file names match expected pattern
+   - Ensure original code exists in `tests/original_code/`
+   - Verify data files are in `tests/original_code/` (Jstar.csv, G_func.csv, etc.)
 
 2. **Numerical tolerance exceeded**
    - Check if differences are small and acceptable
    - May need to adjust tolerance for that specific step
    - Investigate if implementation differs in meaningful way
 
-3. **IPCA sign mismatch**
-   - Normal for factors to flip sign
-   - Test automatically handles ±1 correlation
-   - If test fails, factors may differ structurally
-
-4. **Random seed not working**
+3. **Random seed not working**
    - Verify TEST_SEED is used in both versions
    - Check that RNG state is identical at comparison point
-   - Parallel processing must be deterministic
+
+4. **Subprocess failures**
+   - Check stdout/stderr from subprocess.run()
+   - Verify scripts exist: `run_generate_panel.py`, `calculate_moments.py`
+   - Ensure pickle files are being created/deleted properly
 
 ### Debugging Tests
 
@@ -246,44 +275,25 @@ To debug a failing test:
 
 1. Run the specific test file directly:
    ```bash
-   python test_regression_bgn.py
+   cd tests
+   python test_panel_bgn.py
    ```
 
 2. Check the pickle files manually:
    ```bash
-   python ../view_pickle.py outputs/bgn_999_panel.pkl
+   python
+   >>> import pickle
+   >>> with open('outputs/bgn_test_panel.pkl', 'rb') as f:
+   ...     data = pickle.load(f)
+   >>> data.keys()
    ```
 
 3. Add print statements in comparison functions to see values
 
 4. Use Python debugger:
    ```bash
-   python -m pdb test_regression_bgn.py
+   python -m pdb test_panel_bgn.py
    ```
-
-## Extending Tests
-
-### Adding a New Model
-
-1. Copy an existing test file (e.g., `test_regression_bgn.py`)
-2. Update class name and model references
-3. Update array keys to match new model's output
-4. Add to `run_all_regression_tests.py`
-
-### Adding a New Workflow Step
-
-1. Add new test method to each model test class
-2. Follow naming convention: `test_0X_stepname()`
-3. Update `tests` list in `main()` function
-4. Document in this file and README.md
-
-### Modifying Tolerances
-
-If numerical tolerances need adjustment:
-
-1. Update tolerance in specific test method
-2. Add comment explaining why tolerance changed
-3. Document in this file under "Numerical Tolerances"
 
 ## Maintenance
 
@@ -294,19 +304,12 @@ If numerical tolerances need adjustment:
 - Before creating a release
 - When debugging numerical discrepancies
 
-### Updating Test Configuration
-
-If production parameters change, update `config_override.py` to maintain:
-- N/T ratio similar to production
-- Burnin fraction similar to production
-- Feature counts representative of production
-
 ### Version Control
 
 All test files should be committed to git:
 ```bash
 git add tests/
-git commit -m "Add comprehensive regression test suite"
+git commit -m "Update regression test suite"
 ```
 
-Do NOT commit test output files (`outputs/` directory).
+Do NOT commit test output files (`outputs/` directory) or pickle files.

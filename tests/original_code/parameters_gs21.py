@@ -1,4 +1,11 @@
 import numpy as np
+import sys
+from pathlib import Path
+
+# Import burnin from main config.py
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from config import GS21_BURNIN as burnin
+
 beta = 0.994 # subjective discount factor
 psi = 2 # elasticity of intertemp subst
 gamma = 10 # risk aversion
@@ -20,4 +27,3 @@ zeta = 0.03/3 # bond refinancing cost
 imin = 0 # minimum investment cost
 imax = 2000 # maximum investment cost
 r = 0.074830/12 # risk-free rate
-burnin = 300  # Updated to match current code's GS21_BURNIN
