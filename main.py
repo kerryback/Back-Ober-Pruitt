@@ -198,6 +198,19 @@ def main():
     """Main orchestration function."""
     overall_start = time.time()
 
+    # Print global parameters FIRST so user can cancel if incorrect
+    print("="*70)
+    print("BACK-OBER-PRUITT - COMPLETE WORKFLOW")
+    print("="*70)
+    print(f"Global Parameters:")
+    print(f"  N (firms):        {N}")
+    print(f"  T (periods):      {T}")
+    print(f"  BGN burnin:       {BGN_BURNIN}")
+    print(f"  KP14 burnin:      {KP14_BURNIN}")
+    print(f"  GS21 burnin:      {GS21_BURNIN}")
+    print("="*70)
+    print()
+
     # Parse arguments
     if len(sys.argv) < 2:
         print("ERROR: Model name required")
@@ -247,17 +260,7 @@ def main():
     sys.stderr = log_handle
 
     try:
-        print("="*70)
-        print("BACK-OBER-PRUITT - COMPLETE WORKFLOW")
-        print("="*70)
         print(f"Started at {datetime.now().strftime('%a %d %b %Y, %I:%M%p')}")
-        print()
-        print(f"Global Parameters:")
-        print(f"  N (firms):        {N}")
-        print(f"  T (periods):      {T}")
-        print(f"  BGN burnin:       {BGN_BURNIN}")
-        print(f"  KP14 burnin:      {KP14_BURNIN}")
-        print(f"  GS21 burnin:      {GS21_BURNIN}")
         print()
         print(f"Configuration:")
         print(f"  Model: {model}")
