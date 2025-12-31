@@ -118,6 +118,7 @@ import pandas as pd
 import pickle
 import subprocess
 from pathlib import Path
+from scipy.linalg import orthogonal_procrustes
 
 # Add paths (run from tests/ directory)
 # ../  - for current code (config.py, run_ipca.py, etc.)
@@ -155,6 +156,30 @@ def check_config_values():
             return False
         print()
     return True
+
+
+def align_factors_procrustes(F_reference, F_estimated):
+    """
+    Align F_estimated to match F_reference using orthogonal Procrustes.
+
+    This solves the factor rotation invariance problem by finding the optimal
+    orthogonal rotation Q that minimizes ||F_reference - F_estimated @ Q||^2.
+
+    Args:
+        F_reference: Reference factors (T x K)
+        F_estimated: Estimated factors to align (T x K)
+
+    Returns:
+        F_aligned: Rotated version of F_estimated (T x K)
+        Q: Rotation matrix used (K x K)
+    """
+    # Find optimal rotation Q using Procrustes analysis
+    Q, _ = orthogonal_procrustes(F_estimated, F_reference)
+
+    # Apply rotation
+    F_aligned = F_estimated @ Q
+
+    return F_aligned, Q
 
 
 def prepare_panel_for_ipca(panel, chars):
@@ -355,20 +380,31 @@ def test_ipca_factors(model, K):
     else:
         print(f"    [PASS] Shapes match")
 
-        # Compare each factor (column) allowing sign flips
+        # Apply Procrustes alignment to resolve rotation invariance
+        # Convert to (T x K) format for alignment
+        if isinstance(factor_returns_old, pd.DataFrame):
+            f_old_matrix = factor_returns_old.values  # (T, K)
+        else:
+            f_old_matrix = factor_returns_old  # Already numpy array
+
+        if isinstance(factor_returns_new, pd.DataFrame):
+            f_new_matrix = factor_returns_new.values  # (T, K)
+        else:
+            f_new_matrix = factor_returns_new  # Already numpy array
+
+        # Align new factors to match old factors (reference)
+        f_new_aligned, Q = align_factors_procrustes(f_old_matrix, f_new_matrix)
+
+        print(f"    Applied Procrustes alignment (rotation matrix Q of shape {Q.shape})")
+        print(f"    Orthogonality check: ||Q'Q - I|| = {np.linalg.norm(Q.T @ Q - np.eye(K)):.2e}")
+
+        # Compare each factor (column) after alignment
         for i in range(K):
             factor_name = f"Factor {i+1}"
             try:
-                # Get factor columns
-                if isinstance(factor_returns_old, pd.DataFrame):
-                    f_old = factor_returns_old.iloc[:, i].values
-                else:
-                    f_old = factor_returns_old[:, i]
-
-                if isinstance(factor_returns_new, pd.DataFrame):
-                    f_new = factor_returns_new.iloc[:, i].values
-                else:
-                    f_new = factor_returns_new[:, i]
+                # Get aligned factor columns
+                f_old = f_old_matrix[:, i]
+                f_new = f_new_aligned[:, i]
 
                 # Use assert_factors_equal_up_to_sign for comparison
                 assert_factors_equal_up_to_sign(

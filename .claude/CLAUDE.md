@@ -98,6 +98,84 @@ If you encounter code with placeholders or simplified implementations:
 2. **Do not perpetuate the pattern** in new code
 3. **Offer to fix it properly** if asked to work on that code
 
+## 🚨 CRITICAL: FILE EDITING PROTOCOL 🚨
+
+**ABSOLUTE REQUIREMENT - THIS IS NON-NEGOTIABLE:**
+
+When editing any file in this project:
+
+### Mandatory Process (Silent Verification):
+
+**The user has given blanket approval for the backup/diff/cleanup process to happen automatically and silently.**
+
+1. **Create backup first** (silently): Before ANY edit, create a backup of the original file
+   - Backup naming: `{filename}.backup` or `{filename}.bak`
+   - Do NOT announce backup creation to the user
+
+2. **Make the requested edit**: Perform only the specific changes requested
+   - Do not fix unrelated issues
+   - Do not refactor surrounding code
+   - Do not apply "improvements" without approval
+
+3. **Compare and verify** (silently): After editing, run diff to compare the new file to the backup
+   - Do NOT show the diff output to the user
+   - Verify ONLY the requested changes were made
+   - **ONLY if unexpected changes are found**: Alert the user and ask for approval
+
+4. **Cleanup** (silently): After verification succeeds, delete the backup file
+   - Do NOT announce cleanup to the user
+
+### When to Alert the User:
+
+- ✅ Proceed silently: If only the expected changes are present
+- ⚠️ Alert immediately: If ANY unexpected changes are detected
+- ⚠️ Alert immediately: If other issues are noticed that should be fixed
+
+### Process Example:
+
+✅ **CORRECT Workflow (Silent Success):**
+```
+1. User requests: "Change variable name from 'x' to 'data'"
+2. Silently create: file.py.backup
+3. Edit file.py: Change only 'x' to 'data'
+4. Silently run: diff file.py file.py.backup
+5. Verify: Only 'x' → 'data' changes present
+6. Silently delete: file.py.backup
+7. Report to user: "Updated variable name from 'x' to 'data'" (no mention of backup/diff/cleanup)
+```
+
+✅ **CORRECT Workflow (Alert on Unexpected Changes):**
+```
+1. User requests: "Change variable name from 'x' to 'data'"
+2. Silently create: file.py.backup
+3. Edit file.py: Change 'x' to 'data', but also accidentally changed formatting
+4. Silently run: diff file.py file.py.backup
+5. Detect: Unexpected formatting changes
+6. ALERT USER: "I found unexpected changes beyond the requested edit: [show diff]. Should I proceed?"
+7. Keep backup until user responds
+```
+
+❌ **WRONG Workflow:**
+```
+1. User requests: "Change variable name from 'x' to 'data'"
+2. Report: "Creating backup file.py.backup..."
+3. Edit file.py
+4. Report: "Running diff..."
+5. Report: "Diff output: ..."
+6. Report: "Deleting backup..."
+7. Report: "Done!"
+(TOO VERBOSE - user doesn't need to see the verification process)
+```
+
+### Why This Matters:
+
+Unauthorized changes are **dangerous** because:
+1. User loses control over what's being modified
+2. Unintended changes can introduce bugs
+3. Makes code review difficult
+4. Breaks trust in the editing process
+5. Can conflict with intentional design decisions
+
 ## Critical Windows Issues
 
 ### 1. Console Encoding (cp1252)

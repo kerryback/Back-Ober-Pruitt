@@ -223,8 +223,9 @@ def mve_data(
 
     else:
         # Standard ridge regression for all alphas at once
-        # Penalty scales with nfeatures to match original code
-        betas = ridge_regression_grid(X, y, 360 * nfeatures * alpha_lst)
+        # Note: alpha_lst is already scaled by nfeatures in calling code (portfolio_stats.py)
+        # ridge_regression_grid applies 360* internally, so just pass alpha_lst
+        betas = ridge_regression_grid(X, y, alpha_lst)
 
     # Return as DataFrame
     return pd.DataFrame(betas, index=index_cols, columns=alpha_lst)

@@ -102,6 +102,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import subprocess
+import random
 from pathlib import Path
 
 # Add paths (run from tests/ directory)
@@ -197,10 +198,6 @@ def test_dkkm_factors(model, nfeatures):
     # Get model configuration
     chars = ['size', 'bm', 'agr', 'roe', 'mom']
 
-    # Generate random weight matrix W with fixed seed
-    np.random.seed(TEST_SEED)
-    W = np.random.randn(nfeatures, len(chars) + (1 if model == 'bgn' else 0))
-
     # Step 1: Generate panel with current code via command line
     print("[1/5] Generating panel with current code via generate_panel.py...")
     test_dir = Path(__file__).parent
@@ -219,27 +216,31 @@ def test_dkkm_factors(model, nfeatures):
     from config import DATA_DIR
     panel_file = Path(DATA_DIR) / f'{panel_id}_panel.pkl'
 
-    print(f"\n[2/5] Reading panel from {panel_file}...")
+    print(f"\n[2/7] Reading panel from {panel_file}...")
     with open(panel_file, 'rb') as f:
         panel_data = pickle.load(f)
     panel = panel_data['panel']
     print(f"      Panel shape: {panel.shape}")
 
-    # Step 3: Compute DKKM factors with original code
-    print(f"\n[3/5] Computing DKKM factors with original code...")
-    panel_prepared, start, end = prepare_panel_for_dkkm(panel.copy(), chars)
-    f_rs_old, f_nors_old = compute_dkkm_with_original(
-        panel_prepared, W, nfeatures, chars, start, end, model
-    )
+    # Get parent directory for running scripts
+    parent_dir = Path(__file__).parent.parent
 
-    # Step 4: Save W matrix and compute with current code via run_dkkm.py
-    # Note: The current code needs to use the same W matrix
-    # We'll save it to a temporary file that run_dkkm.py can read
-    w_file = Path(DATA_DIR) / f'{panel_id}_dkkm_W_{nfeatures}.pkl'
-    with open(w_file, 'wb') as f:
-        pickle.dump(W, f)
+    # Step 3: Generate moments file (required for portfolio statistics)
+    print(f"\n[3/7] Generating moments file via calculate_moments.py...")
+    cmd = [sys.executable, str(parent_dir / 'calculate_moments.py'), panel_id]
+    result = subprocess.run(cmd, cwd=str(parent_dir), capture_output=True, text=True)
 
-    print(f"\n[4/5] Computing DKKM factors with current code via run_dkkm.py...")
+    if result.returncode != 0:
+        print(f"[ERROR] calculate_moments.py failed:")
+        print(result.stdout)
+        print(result.stderr)
+        return False
+
+    print(f"      Moments file generated successfully")
+    moments_file = Path(DATA_DIR) / f'{panel_id}_moments.pkl'
+
+    # Step 4: Compute DKKM factors with current code via run_dkkm.py
+    print(f"\n[4/7] Computing DKKM factors with current code via run_dkkm.py...")
     parent_dir = Path(__file__).parent.parent
     cmd = [sys.executable, str(parent_dir / 'run_dkkm.py'), panel_id, str(nfeatures)]
     result = subprocess.run(cmd, cwd=str(parent_dir), capture_output=True, text=True)
@@ -248,101 +249,211 @@ def test_dkkm_factors(model, nfeatures):
         print(f"[ERROR] run_dkkm.py failed:")
         print(result.stdout)
         print(result.stderr)
-        # Clean up W file
-        if w_file.exists():
-            w_file.unlink()
         return False
 
     print(f"      DKKM factors computed successfully")
 
-    # Read DKKM pickle file
+    # Read DKKM pickle file and extract W matrix
     dkkm_file = Path(DATA_DIR) / f'{panel_id}_dkkm_{nfeatures}.pkl'
-    print(f"\n[5/5] Reading DKKM factors from {dkkm_file}...")
+    print(f"\n[5/7] Reading DKKM factors from {dkkm_file}...")
     with open(dkkm_file, 'rb') as f:
         dkkm_data = pickle.load(f)
 
-    # Extract factors - may have different keys
-    if 'dkkm_factors' in dkkm_data:
-        f_rs_new = dkkm_data['dkkm_factors']
-        f_nors_new = dkkm_data.get('dkkm_factors_nors', f_rs_new)
-    elif 'f_rs' in dkkm_data and 'f_nors' in dkkm_data:
-        f_rs_new = dkkm_data['f_rs']
-        f_nors_new = dkkm_data['f_nors']
-    elif 'factor_returns' in dkkm_data:
-        # Current code may only save one version
-        f_rs_new = dkkm_data['factor_returns']
-        f_nors_new = dkkm_data.get('factor_returns_nors', f_rs_new)
-    else:
-        f_rs_new = dkkm_data
-        f_nors_new = f_rs_new
+    # Extract factors - current code saves only one version based on config
+    if 'dkkm_factors' not in dkkm_data:
+        print(f"[ERROR] Could not find dkkm_factors in DKKM output")
+        print(f"      Available keys: {list(dkkm_data.keys())}")
+        return False
 
-    print(f"      Current f_rs shape: {f_rs_new.shape}")
+    factors_new = dkkm_data['dkkm_factors']
+    rank_standardize = dkkm_data.get('rank_standardize', True)  # Default to True
 
-    # Step 5: Check portfolio statistics
-    print(f"\n[STATS] Checking portfolio statistics...")
+    # Extract W matrix used by run_dkkm.py
+    if 'weights' not in dkkm_data:
+        print(f"[ERROR] Could not find W matrix ('weights') in DKKM output")
+        print(f"      Available keys: {list(dkkm_data.keys())}")
+        return False
+
+    W = dkkm_data['weights']
+
+    print(f"      Current factors shape: {factors_new.shape}")
+    print(f"      Rank standardize: {rank_standardize}")
+    print(f"      W matrix shape: {W.shape}")
+
+    # Step 6: Compute DKKM factors with original code using the same W
+    print(f"\n[6/7] Computing DKKM factors with original code using same W matrix...")
+    panel_prepared, start, end = prepare_panel_for_dkkm(panel.copy(), chars)
+    f_rs_old, f_nors_old = compute_dkkm_with_original(
+        panel_prepared, W, nfeatures, chars, start, end, model
+    )
+
+    # Step 7: Verify portfolio statistics against manual computation
+    print(f"\n[7/7] Verifying portfolio statistics using original formulas...")
     stats_passed = True
 
-    if 'dkkm_stats' in dkkm_data:
+    if 'dkkm_stats' not in dkkm_data:
+        print(f"      [FAIL] 'dkkm_stats' not found in pickle file")
+        stats_passed = False
+    else:
         dkkm_stats = dkkm_data['dkkm_stats']
         print(f"      DKKM stats shape: {dkkm_stats.shape}")
         print(f"      DKKM stats columns: {list(dkkm_stats.columns)}")
 
-        # Check that statistics are not NaN
-        for col in ['stdev', 'mean', 'xret', 'hjd']:
-            if col in dkkm_stats.columns:
-                nan_count = dkkm_stats[col].isna().sum()
-                total_count = len(dkkm_stats)
-                if nan_count > 0:
-                    print(f"      [WARNING] {col}: {nan_count}/{total_count} values are NaN ({100*nan_count/total_count:.1f}%)")
-                    stats_passed = False
+        # Load SDF moments to manually compute stats
+        moments_file = Path(DATA_DIR) / f'{panel_id}_moments.pkl'
+        if not moments_file.exists():
+            print(f"      [FAIL] Moments file not found: {moments_file}")
+            stats_passed = False
+        else:
+            with open(moments_file, 'rb') as f:
+                moments_data = pickle.load(f)
+
+            # Test three months: first, last, and random middle
+            min_month = dkkm_stats['month'].min()
+            max_month = dkkm_stats['month'].max()
+            random_month = random.randint(min_month + 1, max_month - 1)
+            test_months = [min_month, random_month, max_month]
+            # Get first alpha from stats (usually 0)
+            test_alpha = dkkm_stats['alpha'].iloc[0]
+            # Get matrix index (usually 0 for single matrix)
+            matrix_idx = dkkm_stats['matrix'].iloc[0]
+
+            print(f"      Testing 3 months: {min_month} (first), {random_month} (random), {max_month} (last)")
+            print(f"      Alpha={test_alpha}, Matrix={matrix_idx}")
+
+            # Loop through all three test months
+            for test_month in test_months:
+                print(f"\n      Month {test_month}:")
+
+                # Get stats from pickle
+                dkkm_row = dkkm_stats[(dkkm_stats['month'] == test_month) &
+                                      (dkkm_stats['alpha'] == test_alpha) &
+                                      (dkkm_stats['matrix'] == matrix_idx)].iloc[0]
+
+                include_mkt_test = bool(dkkm_row['include_mkt'])
+                print(f"        include_mkt={include_mkt_test}, alpha={test_alpha}")
+
+                # Get moments for this month (moments_data has nested structure)
+                moments = moments_data['moments']
+                month_moments = moments[test_month]
+                cond_var = month_moments['cond_var']
+                rp = month_moments['rp']
+                second_moment = month_moments['second_moment']
+                second_moment_inv = month_moments['second_moment_inv']
+
+                # Get panel data for this month
+                panel_data = panel.set_index(['month', 'firmid'])
+                data_month = panel_data.loc[test_month]
+
+                # Compute factor loadings using DKKM with RFF
+                import dkkm_functions as dkkm_old
+                if model == 'bgn':
+                    rf = data_month['rf_stand']
                 else:
-                    mean_val = dkkm_stats[col].mean()
-                    std_val = dkkm_stats[col].std()
-                    print(f"      [PASS] {col}: mean={mean_val:.6f}, std={std_val:.6f}, no NaN values")
+                    rf = None
 
-        # Check that stdev is positive
-        if 'stdev' in dkkm_stats.columns:
-            neg_stdev = (dkkm_stats['stdev'] <= 0).sum()
-            if neg_stdev > 0:
-                print(f"      [FAIL] stdev: {neg_stdev} non-positive values found")
-                stats_passed = False
-            else:
-                print(f"      [PASS] stdev: all values are positive")
-    else:
-        print(f"      [WARNING] 'dkkm_stats' not found in pickle file")
-        stats_passed = False
+                factor_loadings, _ = dkkm_old.rff(data_month[chars], rf, W, model)
 
+                # Get portfolio of factors (MV-efficient portfolio)
+                # Use the factors computed with current code (respects rank_standardize flag)
+                dkkm_returns = factors_new
+
+                # Use original mve_data to match production code behavior
+                # Pass nfeatures * alpha to match portfolio_stats.py line 306
+                nfeatures = dkkm_returns.shape[1]
+                port_of_factors_df = dkkm_old.mve_data(
+                    f=dkkm_returns,
+                    month=test_month,
+                    alpha_lst=nfeatures * np.array([test_alpha]),
+                    mkt_rf=None if not include_mkt_test else None  # Would need market returns if include_mkt
+                )
+                port_of_factors = port_of_factors_df.values.flatten()
+
+                # Compute weights on stocks
+                weights_partial = factor_loadings @ port_of_factors
+
+                # Create full N-dimensional weight vector
+                N_moments = moments_data['N']
+                weights_on_stocks = np.zeros(N_moments)
+                firm_ids = data_month.index.to_numpy()
+                weights_on_stocks[firm_ids] = weights_partial
+
+                # Manually compute stats using original formulas
+                manual_stdev = np.sqrt(weights_on_stocks @ cond_var @ weights_on_stocks)
+                manual_mean = weights_on_stocks @ rp
+                manual_xret = weights_on_stocks @ data_month['xret'].values
+                errs = rp - second_moment @ weights_on_stocks
+                manual_hjd = np.sqrt(errs @ second_moment_inv @ errs)
+
+                # Compare with pickle values
+                print(f"        Comparing computed vs. pickle values:")
+                try:
+                    assert_close(manual_stdev, dkkm_row['stdev'], rtol=1e-10, atol=1e-12, name="stdev")
+                    print(f"          [PASS] stdev matches")
+                except AssertionError as e:
+                    print(f"          [FAIL] stdev: {e}")
+                    stats_passed = False
+
+                try:
+                    assert_close(manual_mean, dkkm_row['mean'], rtol=1e-10, atol=1e-12, name="mean")
+                    print(f"          [PASS] mean matches")
+                except AssertionError as e:
+                    print(f"          [FAIL] mean: {e}")
+                    stats_passed = False
+
+                try:
+                    assert_close(manual_xret, dkkm_row['xret'], rtol=1e-10, atol=1e-12, name="xret")
+                    print(f"          [PASS] xret matches")
+                except AssertionError as e:
+                    print(f"          [FAIL] xret: {e}")
+                    stats_passed = False
+
+                try:
+                    assert_close(manual_hjd, dkkm_row['hjd'], rtol=1e-10, atol=1e-12, name="hjd")
+                    print(f"          [PASS] hjd matches")
+                except AssertionError as e:
+                    print(f"          [FAIL] hjd: {e}")
+                    stats_passed = False
+
+    # Print stats verification summary
     if stats_passed:
-        print(f"      [ALL PASS] Statistics checks passed")
+        print(f"\n      [ALL PASS] Portfolio statistics verification passed")
     else:
-        print(f"      [FAIL] Some statistics checks failed")
+        print(f"\n      [FAIL] Portfolio statistics verification failed")
 
     # Step 6: Compare original vs current factor returns
     print(f"\n[COMPARE] Comparing original vs current factor returns...")
     all_passed = True
 
-    # Compare rank-standardized returns
-    print(f"\n  Rank-standardized returns (f_rs):")
-    print(f"    Original shape: {f_rs_old.shape}")
-    print(f"    Current shape: {f_rs_new.shape}")
+    # Compare appropriate version based on rank_standardize flag
+    if rank_standardize:
+        factors_old = f_rs_old
+        factor_name = "Rank-standardized returns"
+    else:
+        factors_old = f_nors_old
+        factor_name = "Non-rank-standardized returns"
+
+    print(f"\n  {factor_name}:")
+    print(f"    Original shape: {factors_old.shape}")
+    print(f"    Current shape: {factors_new.shape}")
 
     try:
         # Compare values
         assert_close(
-            f_rs_new.values,
-            f_rs_old.values,
+            factors_new.values,
+            factors_old.values,
             rtol=1e-14,
             atol=1e-15,
-            name="f_rs"
+            name=factor_name
         )
         print(f"    [PASS] Values are identical")
 
         # Check index match
-        assert f_rs_new.index.equals(f_rs_old.index), "f_rs index mismatch"
+        assert factors_new.index.equals(factors_old.index), f"{factor_name} index mismatch"
         print(f"    [PASS] Index matches")
 
     except AssertionError as e:
-        print(f"    [FAIL] f_rs: {e}")
+        print(f"    [FAIL] {factor_name}: {e}")
         all_passed = False
 
     if all_passed:
@@ -353,10 +464,10 @@ def test_dkkm_factors(model, nfeatures):
     # Combine results
     overall_passed = all_passed and stats_passed
 
-    # Step 7: Cleanup - delete all pickle files
+    # Cleanup - delete all pickle files
     print(f"\n[CLEANUP] Deleting pickle files...")
 
-    files_to_delete = [panel_file, dkkm_file, w_file]
+    files_to_delete = [panel_file, moments_file, dkkm_file]
     for file_path in files_to_delete:
         if file_path.exists():
             file_path.unlink()

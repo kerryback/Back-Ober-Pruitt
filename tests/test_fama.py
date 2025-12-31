@@ -106,6 +106,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import subprocess
+import random
 from pathlib import Path
 
 # Add paths (run from tests/ directory)
@@ -235,21 +236,38 @@ def test_fama_factors(model):
     from config import DATA_DIR
     panel_file = Path(DATA_DIR) / f'{panel_id}_panel.pkl'
 
-    print(f"\n[2/5] Reading panel from {panel_file}...")
+    print(f"\n[2/7] Reading panel from {panel_file}...")
     with open(panel_file, 'rb') as f:
         panel_data = pickle.load(f)
     panel = panel_data['panel']
     print(f"      Panel shape: {panel.shape}")
 
-    # Step 3: Compute Fama factors with original code
-    print(f"\n[3/5] Computing Fama factors with original code...")
+    # Get parent directory for running scripts
+    parent_dir = Path(__file__).parent.parent
+
+    # Step 3: Generate moments file (required for portfolio statistics)
+    print(f"\n[3/7] Generating moments file via calculate_moments.py...")
+    cmd = [sys.executable, str(parent_dir / 'calculate_moments.py'), panel_id]
+    result = subprocess.run(cmd, cwd=str(parent_dir), capture_output=True, text=True)
+
+    if result.returncode != 0:
+        print(f"[ERROR] calculate_moments.py failed:")
+        print(result.stdout)
+        print(result.stderr)
+        return False
+
+    print(f"      Moments file generated successfully")
+    moments_file = Path(DATA_DIR) / f'{panel_id}_moments.pkl'
+
+    # Step 4: Compute Fama factors with original code
+    print(f"\n[4/7] Computing Fama factors with original code...")
     panel_prepared, start, end = prepare_panel_for_fama(panel.copy(), chars)
     ff_returns_old, fm_returns_old = compute_fama_with_original(
         panel_prepared, chars, start, end
     )
 
-    # Step 4: Compute Fama factors with current code via run_fama.py
-    print(f"\n[4/5] Computing Fama factors with current code via run_fama.py...")
+    # Step 5: Compute Fama factors with current code via run_fama.py
+    print(f"\n[5/7] Computing Fama factors with current code via run_fama.py...")
     parent_dir = Path(__file__).parent.parent
     cmd = [sys.executable, str(parent_dir / 'run_fama.py'), panel_id]
     result = subprocess.run(cmd, cwd=str(parent_dir), capture_output=True, text=True)
@@ -264,7 +282,7 @@ def test_fama_factors(model):
 
     # Read fama pickle file
     fama_file = Path(DATA_DIR) / f'{panel_id}_fama.pkl'
-    print(f"\n[5/5] Reading Fama factors from {fama_file}...")
+    print(f"\n[6/7] Reading Fama factors from {fama_file}...")
     with open(fama_file, 'rb') as f:
         fama_data = pickle.load(f)
     ff_returns_new = fama_data['ff_returns']
@@ -272,8 +290,8 @@ def test_fama_factors(model):
     print(f"      FF returns shape: {ff_returns_new.shape}")
     print(f"      FM returns shape: {fm_returns_new.shape}")
 
-    # Step 5: Verify portfolio statistics against manual computation
-    print(f"\n[STATS] Verifying portfolio statistics using original formulas...")
+    # Step 7: Verify portfolio statistics against manual computation
+    print(f"\n[7/7] Verifying portfolio statistics using original formulas...")
     stats_passed = True
 
     if 'fama_stats' not in fama_data:
@@ -301,88 +319,105 @@ def test_fama_factors(model):
             with open(moments_file, 'rb') as f:
                 moments_data = pickle.load(f)
 
-            # Test a sample: verify stats for one specific month/alpha
-            test_month = fama_stats['month'].iloc[len(fama_stats)//2]  # Pick middle month
+            # Test three months: first, last, and random middle
+            min_month = fama_stats['month'].min()
+            max_month = fama_stats['month'].max()
+            random_month = random.randint(min_month + 1, max_month - 1)
+            test_months = [min_month, random_month, max_month]
             test_alpha = 0  # No shrinkage
 
-            print(f"      Testing month {test_month}, alpha={test_alpha}")
+            print(f"      Testing 3 months: {min_month} (first), {random_month} (random), {max_month} (last)")
+            print(f"      Alpha={test_alpha}")
 
-            # Get stats from pickle
-            fama_row = fama_stats[(fama_stats['month'] == test_month) &
-                                  (fama_stats['alpha'] == test_alpha) &
-                                  (fama_stats['method'] == 'ff')].iloc[0]
+            # Loop through all three test months
+            for test_month in test_months:
+                print(f"\n      Month {test_month}:")
 
-            # Get moments for this month
-            cond_var = moments_data['cond_var'][test_month]
-            rp = moments_data['rp'][test_month]
-            second_moment = moments_data['second_moment'][test_month]
-            second_moment_inv = moments_data['second_moment_inv'][test_month]
+                # Get stats from pickle
+                fama_row = fama_stats[(fama_stats['month'] == test_month) &
+                                      (fama_stats['alpha'] == test_alpha) &
+                                      (fama_stats['method'] == 'ff')].iloc[0]
 
-            # Get panel data for this month
-            panel_data = panel.set_index(['month', 'firmid'])
-            data_month = panel_data.loc[test_month]
+                # Get moments for this month (moments_data has nested structure)
+                moments = moments_data['moments']
+                month_moments = moments[test_month]
+                cond_var = month_moments['cond_var']
+                rp = month_moments['rp']
+                second_moment = month_moments['second_moment']
+                second_moment_inv = month_moments['second_moment_inv']
 
-            # Compute factor weights (same as original: fama.fama_french)
-            import fama_functions as fama_old
-            factor_weights = fama_old.fama_french(data_month[chars], chars=chars, mve=data_month['mve'])
+                # Get panel data for this month
+                panel_data = panel.set_index(['month', 'firmid'])
+                data_month = panel_data.loc[test_month]
 
-            # Get portfolio of factors (MV-efficient portfolio with alpha=0)
-            ff_returns = fama_data['ff_returns']
-            # Use past 360 months ending at test_month-1
-            hist_start = max(start, test_month - 360)
-            hist_returns = ff_returns.loc[hist_start:test_month-1]
+                # Compute factor weights (same as original: fama.fama_french)
+                import fama_functions as fama_old
+                factor_weights = fama_old.fama_french(data_month[chars], chars=chars, mve=data_month['mve'])
 
-            # Ridge regression with alpha=0 (no shrinkage)
-            from sklearn.linear_model import Ridge
-            X = hist_returns.values
-            y = hist_returns.mean(axis=1).values
-            port_of_factors = Ridge(alpha=0, fit_intercept=False).fit(X, y).coef_
+                # Get portfolio of factors (MV-efficient portfolio with alpha=0)
+                ff_returns = fama_data['ff_returns']
+                # Use past 360 months ending at test_month-1
+                hist_start = max(start, test_month - 360)
+                hist_returns = ff_returns.loc[hist_start:test_month-1]
 
-            # Compute weights on stocks
-            weights_on_stocks = factor_weights @ port_of_factors
+                # Ridge regression with alpha=0 (no shrinkage)
+                # Target is ones vector for mean-variance optimization
+                from sklearn.linear_model import Ridge
+                X = hist_returns.values
+                y = np.ones(len(X))  # Correct target for MV optimization
+                port_of_factors = Ridge(alpha=360*0, fit_intercept=False).fit(X, y).coef_
 
-            # Manually compute stats using original formulas
-            keep_this_month = data_month.index.to_numpy()
-            stock_cov = cond_var[keep_this_month, :][:, keep_this_month]
-            rp_month = rp[keep_this_month]
-            second_moment_month = second_moment[keep_this_month, :][:, keep_this_month]
-            second_moment_inv_month = second_moment_inv[keep_this_month, :][:, keep_this_month]
+                # Compute weights on stocks
+                weights_on_stocks = factor_weights @ port_of_factors
 
-            manual_stdev = np.sqrt(weights_on_stocks @ stock_cov @ weights_on_stocks)
-            manual_mean = weights_on_stocks @ rp_month
-            manual_xret = weights_on_stocks @ data_month['xret'].values
-            errs = rp_month - second_moment_month @ weights_on_stocks
-            manual_hjd = np.sqrt(errs @ second_moment_inv_month @ errs)
+                # Manually compute stats using original formulas
+                keep_this_month = data_month.index.to_numpy()
+                stock_cov = cond_var[keep_this_month, :][:, keep_this_month]
+                rp_month = rp[keep_this_month]
+                second_moment_month = second_moment[keep_this_month, :][:, keep_this_month]
+                second_moment_inv_month = second_moment_inv[keep_this_month, :][:, keep_this_month]
 
-            # Compare with pickle values
-            print(f"      Comparing computed vs. pickle values:")
-            try:
-                assert_close(manual_stdev, fama_row['stdev'], rtol=1e-10, atol=1e-12, name="stdev")
-                print(f"        [PASS] stdev matches")
-            except AssertionError as e:
-                print(f"        [FAIL] stdev: {e}")
-                stats_passed = False
+                manual_stdev = np.sqrt(weights_on_stocks @ stock_cov @ weights_on_stocks)
+                manual_mean = weights_on_stocks @ rp_month
+                manual_xret = weights_on_stocks @ data_month['xret'].values
+                errs = rp_month - second_moment_month @ weights_on_stocks
+                manual_hjd = np.sqrt(errs @ second_moment_inv_month @ errs)
 
-            try:
-                assert_close(manual_mean, fama_row['mean'], rtol=1e-10, atol=1e-12, name="mean")
-                print(f"        [PASS] mean matches")
-            except AssertionError as e:
-                print(f"        [FAIL] mean: {e}")
-                stats_passed = False
+                # Compare with pickle values
+                print(f"        Comparing computed vs. pickle values:")
+                try:
+                    assert_close(manual_stdev, fama_row['stdev'], rtol=1e-10, atol=1e-12, name="stdev")
+                    print(f"          [PASS] stdev matches")
+                except AssertionError as e:
+                    print(f"          [FAIL] stdev: {e}")
+                    stats_passed = False
 
-            try:
-                assert_close(manual_xret, fama_row['xret'], rtol=1e-10, atol=1e-12, name="xret")
-                print(f"        [PASS] xret matches")
-            except AssertionError as e:
-                print(f"        [FAIL] xret: {e}")
-                stats_passed = False
+                try:
+                    assert_close(manual_mean, fama_row['mean'], rtol=1e-10, atol=1e-12, name="mean")
+                    print(f"          [PASS] mean matches")
+                except AssertionError as e:
+                    print(f"          [FAIL] mean: {e}")
+                    stats_passed = False
 
-            try:
-                assert_close(manual_hjd, fama_row['hjd'], rtol=1e-10, atol=1e-12, name="hjd")
-                print(f"        [PASS] hjd matches")
-            except AssertionError as e:
-                print(f"        [FAIL] hjd: {e}")
-                stats_passed = False
+                try:
+                    assert_close(manual_xret, fama_row['xret'], rtol=1e-10, atol=1e-12, name="xret")
+                    print(f"          [PASS] xret matches")
+                except AssertionError as e:
+                    print(f"          [FAIL] xret: {e}")
+                    stats_passed = False
+
+                try:
+                    assert_close(manual_hjd, fama_row['hjd'], rtol=1e-10, atol=1e-12, name="hjd")
+                    print(f"          [PASS] hjd matches")
+                except AssertionError as e:
+                    print(f"          [FAIL] hjd: {e}")
+                    stats_passed = False
+
+    # Print stats verification summary
+    if stats_passed:
+        print(f"\n      [ALL PASS] Portfolio statistics verification passed")
+    else:
+        print(f"\n      [FAIL] Portfolio statistics verification failed")
 
     # Step 6: Compare original vs current factor returns
     print(f"\n[COMPARE] Comparing original vs current factor returns...")
@@ -464,10 +499,10 @@ def test_fama_factors(model):
     # Combine results
     overall_passed = all_passed and stats_passed
 
-    # Step 7: Cleanup - delete all pickle files
+    # Cleanup - delete all pickle files
     print(f"\n[CLEANUP] Deleting pickle files...")
 
-    files_to_delete = [panel_file, fama_file]
+    files_to_delete = [panel_file, moments_file, fama_file]
     for file_path in files_to_delete:
         if file_path.exists():
             file_path.unlink()

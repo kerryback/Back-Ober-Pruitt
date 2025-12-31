@@ -26,19 +26,33 @@ except ImportError:
 if NUMBA_AVAILABLE:
     @numba.njit(parallel=True, fastmath=True, cache=True)
     def _rank_standardize_1d_numba(arr):
-        """Rank standardize 1D array."""
+        """Rank standardize 1D array with average method for ties."""
         N = len(arr)
         sorted_idx = np.argsort(arr)
         ranks = np.empty(N, dtype=np.float64)
 
-        for i in range(N):
-            ranks[sorted_idx[i]] = float(i)
+        # Assign ranks with average method for ties
+        i = 0
+        while i < N:
+            # Find the range of tied values
+            j = i
+            while j < N and arr[sorted_idx[j]] == arr[sorted_idx[i]]:
+                j += 1
 
-        return (ranks + 0.5) / N - 0.5
+            # Average rank for tied values (1-based)
+            avg_rank = (i + j + 1) / 2.0
+
+            # Assign average rank to all tied values
+            for k in range(i, j):
+                ranks[sorted_idx[k]] = avg_rank
+
+            i = j
+
+        return (ranks - 0.5) / N - 0.5
 
     @numba.njit(parallel=True, fastmath=True, cache=True)
     def _rank_standardize_2d_numba(arr):
-        """Rank standardize 2D array (parallel over columns)."""
+        """Rank standardize 2D array (parallel over columns) with average method for ties."""
         N, P = arr.shape
         result = np.empty((N, P), dtype=np.float64)
 
@@ -48,10 +62,24 @@ if NUMBA_AVAILABLE:
             sorted_idx = np.argsort(col)
             ranks = np.empty(N, dtype=np.float64)
 
-            for i in range(N):
-                ranks[sorted_idx[i]] = float(i)
+            # Assign ranks with average method for ties
+            i = 0
+            while i < N:
+                # Find the range of tied values
+                k = i
+                while k < N and col[sorted_idx[k]] == col[sorted_idx[i]]:
+                    k += 1
 
-            result[:, j] = (ranks + 0.5) / N - 0.5
+                # Average rank for tied values (1-based)
+                avg_rank = (i + k + 1) / 2.0
+
+                # Assign average rank to all tied values
+                for m in range(i, k):
+                    ranks[sorted_idx[m]] = avg_rank
+
+                i = k
+
+            result[:, j] = (ranks - 0.5) / N - 0.5
 
         return result
 
@@ -60,6 +88,7 @@ if NUMBA_AVAILABLE:
         Rank standardize array (Numba-accelerated, 3-5x faster).
 
         Maps values to [-0.5, 0.5] based on their rank.
+        Uses average ranking for ties (matches pandas .rank() behavior).
 
         Parameters
         ----------
@@ -80,6 +109,7 @@ if NUMBA_AVAILABLE:
         - Single argsort (vs double in original)
         - Parallel over columns (2D case)
         - No pandas overhead
+        - Average ranking for ties (matches pandas)
         """
         if arr.ndim == 1:
             return _rank_standardize_1d_numba(arr)

@@ -282,6 +282,9 @@ def compute_dkkm_portfolio_stats(
 
     results_list = []
 
+    # Get number of DKKM features (D)
+    nfeatures = dkkm_returns.shape[1]
+
     for month in range(start_month, end_month + 1):
         # Get pre-computed SDF outputs for this month
         if month not in moments:
@@ -295,11 +298,12 @@ def compute_dkkm_portfolio_stats(
 
         for alpha in alpha_lst:
             # Issue #1 fix: Use mve_data for portfolio optimization
+            # Scale alpha by nfeatures to match original code (main.py line 256)
             mkt_rf = mkt_returns if include_mkt else None
             port_of_factors = dkkm.mve_data(
                 dkkm_returns,
                 month,
-                np.array([alpha]),
+                nfeatures * np.array([alpha]),
                 mkt_rf
             )
 
@@ -404,6 +408,9 @@ def compute_ipca_portfolio_stats(
 
     results_list = []
 
+    # Get the actual start month of IPCA returns (not from moments file)
+    ipca_start = ipca_returns.index.min()
+
     for month in range(start_month, end_month + 1):
         # Check if month is in IPCA returns
         if month not in ipca_returns.index:
@@ -431,8 +438,8 @@ def compute_ipca_portfolio_stats(
             available_months = [m for m in range(hist_start, hist_end + 1)
                                if m in ipca_returns.index]
 
-            if len(available_months) < 100:
-                # Not enough history, skip
+            if len(available_months) == 0:
+                # No history available, skip this month
                 continue
 
             X = ipca_returns.loc[available_months].dropna().to_numpy()
@@ -468,8 +475,9 @@ def compute_ipca_portfolio_stats(
 
             # Get IPCA loadings for this month
             # ipca_weights shape: (K, N, n_windows)
-            # IPCA returns start at start_month + 360
-            window_idx = month - (start_month + 360)
+            # window_idx maps current month to the correct window in ipca_weights
+            # IPCA returns/windows start at ipca_start (not start_month!)
+            window_idx = month - ipca_start
 
             if window_idx < 0 or window_idx >= ipca_weights.shape[2]:
                 # Skip months outside valid window range
