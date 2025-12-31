@@ -203,38 +203,73 @@ def prepare_panel_for_ipca(panel, chars):
     return panel_ranked, start, end
 
 
-def compute_ipca_with_original(panel_ranked, K, N, start, end, chars):
-    """Compute IPCA factors using original code."""
+def compute_ipca_with_original(panel_ranked, K, start, end, burnin):
+    """
+    Compute IPCA factors using original code for 3 test months only.
+
+    Test months:
+    - Month 1: burnin + 360 (first testable month after burnin)
+    - Month 2: Random month between (burnin + 361) and (burnin + T - 2)
+    - Month 3: burnin + T - 1 (last month in sample)
+    """
     import ipca_functions as ipca_old
 
     print("Computing IPCA factors with original code...")
     print(f"  Using alternating least squares (original method)")
 
-    # Compute IPCA factors - no RFF (rff=0), no W matrix
-    ipca_weights_on_stocks, ipca_factor_weights = ipca_old.fit_ipca_360(
-        panel=panel_ranked,
-        K=K,
-        N=N,
-        start=start,
-        end=end,
-        rff=0,  # No random Fourier features
-        W=None,
-        chars=chars
-    )
+    # Determine 3 test months
+    T = end - start + 1
+    test_month_1 = burnin + 360  # First testable month
+    test_month_3 = burnin + T - 1  # Last month
 
-    print(f"  Original ipca_weights_on_stocks shape: {ipca_weights_on_stocks.shape}")
-    print(f"  Original ipca_factor_weights shape: {ipca_factor_weights.shape}")
+    # Random month between first and last (for reproducibility, use seed)
+    np.random.seed(TEST_SEED)
+    test_month_2 = np.random.randint(burnin + 361, burnin + T - 1)
 
-    # Convert to factor returns DataFrame
-    # ipca_factor_weights is shape (K, T-360) where each row is a factor
-    # We need to transpose to get (T-360, K)
+    test_months = [test_month_1, test_month_2, test_month_3]
+    print(f"  Testing 3 months: {test_months}")
+
+    # Compute IPCA for each test month
+    tol = 1e-4  # Same tolerance as fit_ipca_360
+    factor_returns_list = []
+    Gamma0, f0 = None, None
+
+    for test_month in test_months:
+        # Each test month uses a 360-month window ending at test_month
+        window_start = test_month - 360
+
+        print(f"  Computing month {test_month} (window: {window_start} to {test_month-1})...")
+
+        # Call fit_ipca for this specific window
+        _factor_port, pi, Gamma1, f1 = ipca_old.fit_ipca(
+            panel=panel_ranked,
+            start=window_start,
+            K=K,
+            tol=tol,
+            Gamma0=Gamma0,
+            f0=f0
+        )
+
+        # Store factor returns (pi) for this month
+        # pi is shape (K,) - the factor portfolio weights at month test_month
+        factor_returns_list.append(pi)
+
+        # Use this as warm start for next month
+        Gamma0, f0 = Gamma1, f1
+
+    # Convert to DataFrame
+    # Stack the 3 months: each row is a month, each column is a factor
+    factor_returns_array = np.array(factor_returns_list)  # Shape (3, K)
     factor_returns = pd.DataFrame(
-        ipca_factor_weights.T,
-        index=range(start + 360, end + 1),
+        factor_returns_array,
+        index=test_months,
         columns=[f'Factor_{i+1}' for i in range(K)]
     )
 
-    return factor_returns, ipca_weights_on_stocks
+    print(f"  Original factor returns shape: {factor_returns.shape}")
+    print(f"  Test months: {list(factor_returns.index)}")
+
+    return factor_returns, None  # No ipca_weights_on_stocks needed for comparison
 
 
 def test_ipca_factors(model, K):
@@ -284,8 +319,8 @@ def test_ipca_factors(model, K):
     # Step 3: Compute IPCA factors with original code
     print(f"\n[3/5] Computing IPCA factors with original code...")
     panel_ranked, start, end = prepare_panel_for_ipca(panel.copy(), chars)
-    factor_returns_old, ipca_weights_old = compute_ipca_with_original(
-        panel_ranked, K, N, start, end, chars
+    factor_returns_old, _ipca_weights_old = compute_ipca_with_original(
+        panel_ranked, K, start, end, burnin
     )
 
     # Step 4: Compute IPCA factors with current code via run_ipca.py
@@ -323,7 +358,30 @@ def test_ipca_factors(model, K):
         print(f"      Available keys: {list(ipca_data.keys())}")
         return False
 
-    print(f"      Current factor returns shape: {factor_returns_new.shape}")
+    print(f"      Current factor returns shape (before filtering): {factor_returns_new.shape}")
+
+    # Filter to the same 3 test months as the original code
+    # Test months are: burnin+360, random month, burnin+T-1
+    T = end - start + 1
+    test_month_1 = burnin + 360
+    test_month_3 = burnin + T - 1
+    np.random.seed(TEST_SEED)  # Same seed as in compute_ipca_with_original
+    test_month_2 = np.random.randint(burnin + 361, burnin + T - 1)
+    test_months = [test_month_1, test_month_2, test_month_3]
+
+    print(f"      Filtering to 3 test months: {test_months}")
+
+    # Filter factor returns to only these months
+    if isinstance(factor_returns_new, pd.DataFrame):
+        # Check if index matches test months
+        factor_returns_new = factor_returns_new.loc[test_months]
+    else:
+        # If numpy array, need to figure out indexing
+        # Assume it's indexed from burnin+360 onwards
+        indices = [m - (burnin + 360) for m in test_months]
+        factor_returns_new = factor_returns_new[indices]
+
+    print(f"      Current factor returns shape (after filtering): {factor_returns_new.shape}")
 
     # Step 5: Check portfolio statistics
     print(f"\n[STATS] Checking portfolio statistics...")
