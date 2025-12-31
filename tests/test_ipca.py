@@ -128,7 +128,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))  # ../
 sys.path.insert(0, str(Path(__file__).parent / 'test_utils'))  # ./test_utils/
 sys.path.insert(0, str(Path(__file__).parent / 'original_code'))  # ./original_code/
 
-from comparison import assert_close, assert_factors_equal_up_to_sign
+from comparison import assert_close
 from config import N, T
 
 # Test configuration
@@ -218,13 +218,13 @@ def compute_ipca_with_original(panel_ranked, K, start, end, burnin):
     print(f"  Using alternating least squares (original method)")
 
     # Determine 3 test months
-    T = end - start + 1
+    n_months = end - start + 1
     test_month_1 = burnin + 360  # First testable month
-    test_month_3 = burnin + T - 1  # Last month
+    test_month_3 = burnin + n_months - 1  # Last month
 
     # Random month between first and last (for reproducibility, use seed)
     np.random.seed(TEST_SEED)
-    test_month_2 = np.random.randint(burnin + 361, burnin + T - 1)
+    test_month_2 = np.random.randint(burnin + 361, burnin + n_months - 1)
 
     test_months = [test_month_1, test_month_2, test_month_3]
     print(f"  Testing 3 months: {test_months}")
@@ -361,12 +361,12 @@ def test_ipca_factors(model, K):
     print(f"      Current factor returns shape (before filtering): {factor_returns_new.shape}")
 
     # Filter to the same 3 test months as the original code
-    # Test months are: burnin+360, random month, burnin+T-1
-    T = end - start + 1
+    # Test months are: burnin+360, random month, burnin+n_months-1
+    n_months = end - start + 1
     test_month_1 = burnin + 360
-    test_month_3 = burnin + T - 1
+    test_month_3 = burnin + n_months - 1
     np.random.seed(TEST_SEED)  # Same seed as in compute_ipca_with_original
-    test_month_2 = np.random.randint(burnin + 361, burnin + T - 1)
+    test_month_2 = np.random.randint(burnin + 361, burnin + n_months - 1)
     test_months = [test_month_1, test_month_2, test_month_3]
 
     print(f"      Filtering to 3 test months: {test_months}")
@@ -464,15 +464,15 @@ def test_ipca_factors(model, K):
                 f_old = f_old_matrix[:, i]
                 f_new = f_new_aligned[:, i]
 
-                # Use assert_factors_equal_up_to_sign for comparison
-                assert_factors_equal_up_to_sign(
-                    f_new.reshape(-1, 1),
-                    f_old.reshape(-1, 1),
+                # Use assert_close for comparison after Procrustes alignment
+                assert_close(
+                    f_new,
+                    f_old,
                     rtol=1e-6,
                     atol=1e-8,
                     name=factor_name
                 )
-                print(f"    [PASS] {factor_name} matches (up to sign)")
+                print(f"    [PASS] {factor_name} matches after Procrustes alignment")
 
             except AssertionError as e:
                 print(f"    [FAIL] {factor_name}: {e}")
