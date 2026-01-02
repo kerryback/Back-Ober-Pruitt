@@ -146,7 +146,7 @@ def compute_fama_portfolio_stats(
         burnin: Burn-in period (must be from config.BGN_BURNIN/KP14_BURNIN/GS21_BURNIN)
 
     Returns:
-        DataFrame with columns: ['month', 'method', 'alpha', 'stdev', 'mean', 'xret', 'hjd']
+        DataFrame with columns: ['month', 'method', 'alpha', 'stdev', 'mean', 'xret', 'sdf_ret', 'hjd']
     """
     if alpha_lst is None:
         alpha_lst = [0]
@@ -177,6 +177,7 @@ def compute_fama_portfolio_stats(
             cond_var = month_moments['cond_var']
             second_moment = month_moments['second_moment']
             second_moment_inv = month_moments['second_moment_inv']
+            sdf_ret = month_moments['sdf_ret']
 
             for alpha in alpha_lst:
                 # Issue #1 fix: Use mve_data for portfolio optimization
@@ -226,6 +227,7 @@ def compute_fama_portfolio_stats(
                     'stdev': stdev,
                     'mean': mean,
                     'xret': xret,
+                    'sdf_ret': sdf_ret,
                     'hjd': hjd
                 })
 
@@ -268,7 +270,7 @@ def compute_dkkm_portfolio_stats(
         burnin: Burn-in period (must be from config.BGN_BURNIN/KP14_BURNIN/GS21_BURNIN)
 
     Returns:
-        DataFrame with columns: ['month', 'matrix', 'alpha', 'include_mkt', 'stdev', 'mean', 'xret', 'hjd']
+        DataFrame with columns: ['month', 'matrix', 'alpha', 'include_mkt', 'stdev', 'mean', 'xret', 'sdf_ret', 'hjd']
     """
     if alpha_lst is None:
         alpha_lst = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1]
@@ -295,6 +297,7 @@ def compute_dkkm_portfolio_stats(
         cond_var = month_moments['cond_var']
         second_moment = month_moments['second_moment']
         second_moment_inv = month_moments['second_moment_inv']
+        sdf_ret = month_moments['sdf_ret']
 
         for alpha in alpha_lst:
             # Issue #1 fix: Use mve_data for portfolio optimization
@@ -352,6 +355,7 @@ def compute_dkkm_portfolio_stats(
                 'stdev': stdev,
                 'mean': mean,
                 'xret': xret,
+                'sdf_ret': sdf_ret,
                 'hjd': hjd
             })
 
@@ -394,7 +398,7 @@ def compute_ipca_portfolio_stats(
         burnin: Burn-in period (must be from config.BGN_BURNIN/KP14_BURNIN/GS21_BURNIN)
 
     Returns:
-        DataFrame with columns: ['month', 'K', 'alpha', 'include_mkt', 'stdev', 'mean', 'xret', 'hjd']
+        DataFrame with columns: ['month', 'K', 'alpha', 'include_mkt', 'stdev', 'mean', 'xret', 'sdf_ret', 'hjd']
     """
     if alpha_lst is None:
         alpha_lst = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1]
@@ -425,6 +429,7 @@ def compute_ipca_portfolio_stats(
         cond_var = month_moments['cond_var']
         second_moment = month_moments['second_moment']
         second_moment_inv = month_moments['second_moment_inv']
+        sdf_ret = month_moments['sdf_ret']
 
         for alpha in alpha_lst:
             # Compute mean-variance efficient portfolio of IPCA factors
@@ -523,6 +528,7 @@ def compute_ipca_portfolio_stats(
                 'stdev': stdev,
                 'mean': mean,
                 'xret': xret,
+                'sdf_ret': sdf_ret,
                 'hjd': hjd
             })
 

@@ -88,12 +88,11 @@ def load_and_process_fama(model: str, panel_indices: List[int]) -> pd.DataFrame:
     for panel_idx in panel_indices:
         panel_id = f"{model}_{panel_idx}"
         fama_file = os.path.join(DATA_DIR, f"{panel_id}_fama.pkl")
-        moments_file = os.path.join(DATA_DIR, f"{panel_id}_moments.pkl")
 
         if not os.path.exists(fama_file):
             continue
 
-        # Load fama stats
+        # Load fama stats (now includes sdf_ret from run_fama.py)
         with open(fama_file, 'rb') as f:
             fama_data = pickle.load(f)
 
@@ -101,36 +100,8 @@ def load_and_process_fama(model: str, panel_indices: List[int]) -> pd.DataFrame:
         if fama_stats is None or len(fama_stats) == 0:
             continue
 
-        # Load moments to get sdf_ret
-        if not os.path.exists(moments_file):
-            print(f"  WARNING: Moments file not found for {panel_id}")
-            continue
-
-        with open(moments_file, 'rb') as f:
-            moments_data = pickle.load(f)
-
-        moments = moments_data.get('moments')
-        if moments is None:
-            print(f"  WARNING: No moments data for {panel_id}")
-            continue
-
-        # Extract sdf_ret for each month
-        sdf_ret_list = []
-        for month in fama_stats['month'].unique():
-            if month in moments:
-                sdf_ret_list.append({'month': month, 'sdf_ret': moments[month]['sdf_ret']})
-
-        if not sdf_ret_list:
-            print(f"  WARNING: No sdf_ret data for {panel_id}")
-            continue
-
-        sdf_ret_df = pd.DataFrame(sdf_ret_list)
-
-        # Merge sdf_ret with fama_stats
-        fama_stats = fama_stats.copy()
-        fama_stats = fama_stats.merge(sdf_ret_df, on='month', how='left')
-
         # Compute sharpe and hjd_sq for each month
+        fama_stats = fama_stats.copy()
         fama_stats['sharpe'] = fama_stats['mean'] / fama_stats['stdev']
         fama_stats['hjd_sq'] = (fama_stats['sdf_ret'] - fama_stats['xret'])**2
         fama_stats['panel'] = panel_idx
@@ -153,20 +124,6 @@ def load_and_process_dkkm(model: str, panel_indices: List[int]) -> pd.DataFrame:
 
     for panel_idx in panel_indices:
         panel_id = f"{model}_{panel_idx}"
-        moments_file = os.path.join(DATA_DIR, f"{panel_id}_moments.pkl")
-
-        # Load moments once per panel to get sdf_ret
-        if not os.path.exists(moments_file):
-            print(f"  WARNING: Moments file not found for {panel_id}")
-            continue
-
-        with open(moments_file, 'rb') as f:
-            moments_data = pickle.load(f)
-
-        moments = moments_data.get('moments')
-        if moments is None:
-            print(f"  WARNING: No moments data for {panel_id}")
-            continue
 
         # Get all DKKM files for this panel
         pattern = os.path.join(DATA_DIR, f"{panel_id}_dkkm_*.pkl")
@@ -182,6 +139,7 @@ def load_and_process_dkkm(model: str, panel_indices: List[int]) -> pd.DataFrame:
             except ValueError:
                 continue
 
+            # Load DKKM stats (now includes sdf_ret from run_dkkm.py)
             with open(filepath, 'rb') as f:
                 dkkm_data = pickle.load(f)
 
@@ -189,23 +147,8 @@ def load_and_process_dkkm(model: str, panel_indices: List[int]) -> pd.DataFrame:
             if dkkm_stats is None or len(dkkm_stats) == 0:
                 continue
 
-            # Extract sdf_ret for each month
-            sdf_ret_list = []
-            for month in dkkm_stats['month'].unique():
-                if month in moments:
-                    sdf_ret_list.append({'month': month, 'sdf_ret': moments[month]['sdf_ret']})
-
-            if not sdf_ret_list:
-                print(f"  WARNING: No sdf_ret data for {panel_id}, nfeatures={nfeatures}")
-                continue
-
-            sdf_ret_df = pd.DataFrame(sdf_ret_list)
-
-            # Merge sdf_ret with dkkm_stats
-            dkkm_stats = dkkm_stats.copy()
-            dkkm_stats = dkkm_stats.merge(sdf_ret_df, on='month', how='left')
-
             # Compute sharpe and hjd_sq for each month
+            dkkm_stats = dkkm_stats.copy()
             dkkm_stats['sharpe'] = dkkm_stats['mean'] / dkkm_stats['stdev']
             dkkm_stats['hjd_sq'] = (dkkm_stats['sdf_ret'] - dkkm_stats['xret'])**2
             dkkm_stats['panel'] = panel_idx
@@ -229,20 +172,6 @@ def load_and_process_ipca(model: str, panel_indices: List[int]) -> pd.DataFrame:
 
     for panel_idx in panel_indices:
         panel_id = f"{model}_{panel_idx}"
-        moments_file = os.path.join(DATA_DIR, f"{panel_id}_moments.pkl")
-
-        # Load moments once per panel to get sdf_ret
-        if not os.path.exists(moments_file):
-            print(f"  WARNING: Moments file not found for {panel_id}")
-            continue
-
-        with open(moments_file, 'rb') as f:
-            moments_data = pickle.load(f)
-
-        moments = moments_data.get('moments')
-        if moments is None:
-            print(f"  WARNING: No moments data for {panel_id}")
-            continue
 
         # Get all IPCA files for this panel
         pattern = os.path.join(DATA_DIR, f"{panel_id}_ipca_*.pkl")
@@ -258,6 +187,7 @@ def load_and_process_ipca(model: str, panel_indices: List[int]) -> pd.DataFrame:
             except ValueError:
                 continue
 
+            # Load IPCA stats (now includes sdf_ret from run_ipca.py)
             with open(filepath, 'rb') as f:
                 ipca_data = pickle.load(f)
 
@@ -265,23 +195,8 @@ def load_and_process_ipca(model: str, panel_indices: List[int]) -> pd.DataFrame:
             if ipca_stats is None or len(ipca_stats) == 0:
                 continue
 
-            # Extract sdf_ret for each month
-            sdf_ret_list = []
-            for month in ipca_stats['month'].unique():
-                if month in moments:
-                    sdf_ret_list.append({'month': month, 'sdf_ret': moments[month]['sdf_ret']})
-
-            if not sdf_ret_list:
-                print(f"  WARNING: No sdf_ret data for {panel_id}, K={K}")
-                continue
-
-            sdf_ret_df = pd.DataFrame(sdf_ret_list)
-
-            # Merge sdf_ret with ipca_stats
-            ipca_stats = ipca_stats.copy()
-            ipca_stats = ipca_stats.merge(sdf_ret_df, on='month', how='left')
-
             # Compute sharpe and hjd_sq for each month
+            ipca_stats = ipca_stats.copy()
             ipca_stats['sharpe'] = ipca_stats['mean'] / ipca_stats['stdev']
             ipca_stats['hjd_sq'] = (ipca_stats['sdf_ret'] - ipca_stats['xret'])**2
             ipca_stats['panel'] = panel_idx
