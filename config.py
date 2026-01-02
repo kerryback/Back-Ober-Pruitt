@@ -10,12 +10,12 @@ import os
 # PANEL DIMENSIONS - CONFIGURE THESE FIRST
 # =============================================================================
 
-N = 50  # Number of firms
-T = 400   # Number of time periods (excluding burnin)
+N = 1000 # Number of firms
+T = 720   # Number of time periods (excluding burnin)
 BGN_BURNIN = 300  # BGN burnin period
 KP14_BURNIN = 300  # KP14 burnin period
 GS21_BURNIN = 300  # GS21 burnin period
-N_JOBS = 10  # Number of parallel jobs
+N_JOBS = 20  # Number of parallel jobs
 
 # =============================================================================
 # DATA DIRECTORY CONFIGURATION
@@ -47,7 +47,7 @@ KEEP_FACTOR_DETAILS = False  # If False, keep only {method}_stats in factor pick
 # DKKM parameters
 INCLUDE_MKT = True  # Include market in DKKM
 NMAT = 1  # Number of weight matrices for DKKM
-N_DKKM_FEATURES_LIST = [6, 36, 360]  # List of feature counts for DKKM computation
+N_DKKM_FEATURES_LIST = [6, 36, 360, 3600, 36000, 360000]  # List of feature counts for DKKM computation
 DKKM_RANK_STANDARDIZE = True  # Rank-standardize characteristics in DKKM
 
 # Shrinkage parameters (Berk-Jameson regularization)
@@ -63,7 +63,7 @@ STDZ_FM = False  # Standardize characteristics in Fama-MacBeth (False matches or
 # =============================================================================
 
 # IPCA estimation parameters
-IPCA_K_VALUES = [1, 2, 3]  # Number of latent factors to estimate
+IPCA_K_VALUES = [1, 2, 3, 4, 5]  # Number of latent factors to estimate
 IPCA_N_RESTARTS = 3  # Random restarts for first window (robustness)
 IPCA_MAX_ITERATIONS = 100  # Max iterations for Stiefel optimization
 IPCA_SIGN_NORMALIZE = True  # Apply sign normalization (positive mean)
