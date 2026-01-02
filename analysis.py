@@ -130,19 +130,12 @@ def load_and_process_fama(model: str, panel_indices: List[int]) -> pd.DataFrame:
         fama_stats = fama_stats.copy()
         fama_stats = fama_stats.merge(sdf_ret_df, on='month', how='left')
 
-        # Compute sharpe and hjd_realized for each month
+        # Compute sharpe and hjd_sq for each month
         fama_stats['sharpe'] = fama_stats['mean'] / fama_stats['stdev']
-        fama_stats['hjd_realized'] = (fama_stats['sdf_ret'] - fama_stats['xret'])**2
+        fama_stats['hjd_sq'] = (fama_stats['sdf_ret'] - fama_stats['xret'])**2
+        fama_stats['panel'] = panel_idx
 
-        # Group by (panel, method, alpha) and compute panel-level statistics
-        panel_stats = fama_stats.groupby(['method', 'alpha']).agg({
-            'sharpe': 'mean',  # Mean sharpe across months
-            'hjd_realized': lambda x: np.sqrt(x.mean())  # sqrt(mean(hjd_realized))
-        }).reset_index()
-
-        panel_stats['panel'] = panel_idx
-        panel_stats.rename(columns={'hjd_realized': 'hjd'}, inplace=True)
-        all_data.append(panel_stats)
+        all_data.append(fama_stats[['panel', 'month', 'method', 'alpha', 'sharpe', 'hjd_sq']])
 
     if all_data:
         return pd.concat(all_data, ignore_index=True)
@@ -212,20 +205,13 @@ def load_and_process_dkkm(model: str, panel_indices: List[int]) -> pd.DataFrame:
             dkkm_stats = dkkm_stats.copy()
             dkkm_stats = dkkm_stats.merge(sdf_ret_df, on='month', how='left')
 
-            # Compute sharpe and hjd_realized for each month
+            # Compute sharpe and hjd_sq for each month
             dkkm_stats['sharpe'] = dkkm_stats['mean'] / dkkm_stats['stdev']
-            dkkm_stats['hjd_realized'] = (dkkm_stats['sdf_ret'] - dkkm_stats['xret'])**2
+            dkkm_stats['hjd_sq'] = (dkkm_stats['sdf_ret'] - dkkm_stats['xret'])**2
+            dkkm_stats['panel'] = panel_idx
+            dkkm_stats['num_factors'] = nfeatures
 
-            # Group by (panel, alpha, nfeatures) and compute panel-level statistics
-            panel_stats = dkkm_stats.groupby(['alpha']).agg({
-                'sharpe': 'mean',
-                'hjd_realized': lambda x: np.sqrt(x.mean())
-            }).reset_index()
-
-            panel_stats['panel'] = panel_idx
-            panel_stats['num_factors'] = nfeatures
-            panel_stats.rename(columns={'hjd_realized': 'hjd'}, inplace=True)
-            all_data.append(panel_stats)
+            all_data.append(dkkm_stats[['panel', 'month', 'alpha', 'num_factors', 'sharpe', 'hjd_sq']])
 
     if all_data:
         return pd.concat(all_data, ignore_index=True)
@@ -295,20 +281,13 @@ def load_and_process_ipca(model: str, panel_indices: List[int]) -> pd.DataFrame:
             ipca_stats = ipca_stats.copy()
             ipca_stats = ipca_stats.merge(sdf_ret_df, on='month', how='left')
 
-            # Compute sharpe and hjd_realized for each month
+            # Compute sharpe and hjd_sq for each month
             ipca_stats['sharpe'] = ipca_stats['mean'] / ipca_stats['stdev']
-            ipca_stats['hjd_realized'] = (ipca_stats['sdf_ret'] - ipca_stats['xret'])**2
+            ipca_stats['hjd_sq'] = (ipca_stats['sdf_ret'] - ipca_stats['xret'])**2
+            ipca_stats['panel'] = panel_idx
+            ipca_stats['num_factors'] = K
 
-            # Group by (panel, alpha, K) and compute panel-level statistics
-            panel_stats = ipca_stats.groupby(['alpha']).agg({
-                'sharpe': 'mean',
-                'hjd_realized': lambda x: np.sqrt(x.mean())
-            }).reset_index()
-
-            panel_stats['panel'] = panel_idx
-            panel_stats['num_factors'] = K
-            panel_stats.rename(columns={'hjd_realized': 'hjd'}, inplace=True)
-            all_data.append(panel_stats)
+            all_data.append(ipca_stats[['panel', 'month', 'alpha', 'num_factors', 'sharpe', 'hjd_sq']])
 
     if all_data:
         return pd.concat(all_data, ignore_index=True)
@@ -338,19 +317,35 @@ def create_fama_table(fama_df: pd.DataFrame, model: str, output_path: str):
 
         row = {'alpha': alpha}
 
-        # FFC sharpe
+        # FFC sharpe: mean across panels of (mean across months)
         ffc_data = alpha_data[alpha_data['method'] == 'ff']
-        row['FFC_sharpe'] = ffc_data['sharpe'].mean() if len(ffc_data) > 0 else np.nan
+        if len(ffc_data) > 0:
+            ffc_panel_sharpe = ffc_data.groupby('panel')['sharpe'].mean()
+            row['FFC_sharpe'] = ffc_panel_sharpe.mean()
+        else:
+            row['FFC_sharpe'] = np.nan
 
-        # FMR sharpe
+        # FMR sharpe: mean across panels of (mean across months)
         fmr_data = alpha_data[alpha_data['method'] == 'fm']
-        row['FMR_sharpe'] = fmr_data['sharpe'].mean() if len(fmr_data) > 0 else np.nan
+        if len(fmr_data) > 0:
+            fmr_panel_sharpe = fmr_data.groupby('panel')['sharpe'].mean()
+            row['FMR_sharpe'] = fmr_panel_sharpe.mean()
+        else:
+            row['FMR_sharpe'] = np.nan
 
-        # FFC hjd
-        row['FFC_hjd'] = ffc_data['hjd'].mean() if len(ffc_data) > 0 else np.nan
+        # FFC hjd: mean across panels of sqrt(mean across months of hjd_sq)
+        if len(ffc_data) > 0:
+            ffc_panel_hjd = ffc_data.groupby('panel')['hjd_sq'].apply(lambda x: np.sqrt(x.mean()))
+            row['FFC_hjd'] = ffc_panel_hjd.mean()
+        else:
+            row['FFC_hjd'] = np.nan
 
-        # FMR hjd
-        row['FMR_hjd'] = fmr_data['hjd'].mean() if len(fmr_data) > 0 else np.nan
+        # FMR hjd: mean across panels of sqrt(mean across months of hjd_sq)
+        if len(fmr_data) > 0:
+            fmr_panel_hjd = fmr_data.groupby('panel')['hjd_sq'].apply(lambda x: np.sqrt(x.mean()))
+            row['FMR_hjd'] = fmr_panel_hjd.mean()
+        else:
+            row['FMR_hjd'] = np.nan
 
         table_data.append(row)
 
@@ -393,26 +388,34 @@ def create_dkkm_tables(dkkm_df: pd.DataFrame, model: str, sharpe_path: str, hjd_
     alphas = sorted(dkkm_df['alpha'].unique())
     num_factors_vals = sorted(dkkm_df['num_factors'].unique())
 
-    # Create sharpe table
+    # Create sharpe table: mean across panels of (mean across months)
     sharpe_table = []
     for alpha in alphas:
         row = {'alpha': alpha}
         alpha_data = dkkm_df[dkkm_df['alpha'] == alpha]
         for nf in num_factors_vals:
             nf_data = alpha_data[alpha_data['num_factors'] == nf]
-            row[nf] = nf_data['sharpe'].mean() if len(nf_data) > 0 else np.nan
+            if len(nf_data) > 0:
+                panel_sharpe = nf_data.groupby('panel')['sharpe'].mean()
+                row[nf] = panel_sharpe.mean()
+            else:
+                row[nf] = np.nan
         sharpe_table.append(row)
 
     sharpe_df = pd.DataFrame(sharpe_table).set_index('alpha')
 
-    # Create hjd table
+    # Create hjd table: mean across panels of sqrt(mean across months of hjd_sq)
     hjd_table = []
     for alpha in alphas:
         row = {'alpha': alpha}
         alpha_data = dkkm_df[dkkm_df['alpha'] == alpha]
         for nf in num_factors_vals:
             nf_data = alpha_data[alpha_data['num_factors'] == nf]
-            row[nf] = nf_data['hjd'].mean() if len(nf_data) > 0 else np.nan
+            if len(nf_data) > 0:
+                panel_hjd = nf_data.groupby('panel')['hjd_sq'].apply(lambda x: np.sqrt(x.mean()))
+                row[nf] = panel_hjd.mean()
+            else:
+                row[nf] = np.nan
         hjd_table.append(row)
 
     hjd_df = pd.DataFrame(hjd_table).set_index('alpha')
@@ -464,26 +467,34 @@ def create_ipca_tables(ipca_df: pd.DataFrame, model: str, sharpe_path: str, hjd_
     alphas = sorted(ipca_df['alpha'].unique())
     num_factors_vals = sorted(ipca_df['num_factors'].unique())
 
-    # Create sharpe table
+    # Create sharpe table: mean across panels of (mean across months)
     sharpe_table = []
     for alpha in alphas:
         row = {'alpha': alpha}
         alpha_data = ipca_df[ipca_df['alpha'] == alpha]
         for K in num_factors_vals:
             K_data = alpha_data[alpha_data['num_factors'] == K]
-            row[K] = K_data['sharpe'].mean() if len(K_data) > 0 else np.nan
+            if len(K_data) > 0:
+                panel_sharpe = K_data.groupby('panel')['sharpe'].mean()
+                row[K] = panel_sharpe.mean()
+            else:
+                row[K] = np.nan
         sharpe_table.append(row)
 
     sharpe_df = pd.DataFrame(sharpe_table).set_index('alpha')
 
-    # Create hjd table
+    # Create hjd table: mean across panels of sqrt(mean across months of hjd_sq)
     hjd_table = []
     for alpha in alphas:
         row = {'alpha': alpha}
         alpha_data = ipca_df[ipca_df['alpha'] == alpha]
         for K in num_factors_vals:
             K_data = alpha_data[alpha_data['num_factors'] == K]
-            row[K] = K_data['hjd'].mean() if len(K_data) > 0 else np.nan
+            if len(K_data) > 0:
+                panel_hjd = K_data.groupby('panel')['hjd_sq'].apply(lambda x: np.sqrt(x.mean()))
+                row[K] = panel_hjd.mean()
+            else:
+                row[K] = np.nan
         hjd_table.append(row)
 
     hjd_df = pd.DataFrame(hjd_table).set_index('alpha')
@@ -578,7 +589,9 @@ def create_fama_boxplots(fama_df: pd.DataFrame, model: str):
         for method, method_label in [('ff', 'FFC'), ('fm', 'FMR')]:
             data = fama_df[(fama_df['alpha'] == alpha) & (fama_df['method'] == method)]
             if len(data) > 0:
-                boxplot_data.append(data['hjd'].values)
+                # Compute HJD per panel: sqrt(mean(hjd_sq))
+                panel_hjd = data.groupby('panel')['hjd_sq'].apply(lambda x: np.sqrt(x.mean()))
+                boxplot_data.append(panel_hjd.values)
                 labels.append(f"{method_label}\n$\\alpha$={alpha:.1e}")
 
     # Check if all data groups have only 1 point
@@ -669,7 +682,9 @@ def create_dkkm_boxplots(dkkm_df: pd.DataFrame, model: str):
         for nf in num_factors_vals:
             data = dkkm_df[(dkkm_df['alpha'] == alpha) & (dkkm_df['num_factors'] == nf)]
             if len(data) > 0:
-                boxplot_data.append(data['hjd'].values)
+                # Compute HJD per panel: sqrt(mean(hjd_sq))
+                panel_hjd = data.groupby('panel')['hjd_sq'].apply(lambda x: np.sqrt(x.mean()))
+                boxplot_data.append(panel_hjd.values)
                 labels.append(f"$\\alpha$={alpha:.1e}\nn={nf}")
 
     # Check if all data groups have only 1 point
@@ -760,7 +775,9 @@ def create_ipca_boxplots(ipca_df: pd.DataFrame, model: str):
         for K in num_factors_vals:
             data = ipca_df[(ipca_df['alpha'] == alpha) & (ipca_df['num_factors'] == K)]
             if len(data) > 0:
-                boxplot_data.append(data['hjd'].values)
+                # Compute HJD per panel: sqrt(mean(hjd_sq))
+                panel_hjd = data.groupby('panel')['hjd_sq'].apply(lambda x: np.sqrt(x.mean()))
+                boxplot_data.append(panel_hjd.values)
                 labels.append(f"$\\alpha$={alpha:.1e}\nK={K}")
 
     # Check if all data groups have only 1 point
