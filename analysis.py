@@ -549,7 +549,9 @@ def create_fama_boxplots(fama_df: pd.DataFrame, model: str):
         for method, method_label in [('ff', 'FFC'), ('fm', 'FMR')]:
             data = fama_df[(fama_df['alpha'] == alpha) & (fama_df['method'] == method)]
             if len(data) > 0:
-                boxplot_data.append(data['sharpe'].values)
+                # Compute Sharpe per panel: mean(sharpe)
+                panel_sharpe = data.groupby('panel')['sharpe'].mean()
+                boxplot_data.append(panel_sharpe.values)
                 labels.append(f"{method_label}\n$\\alpha$={alpha:.1e}")
 
     # Check if all data groups have only 1 point
@@ -642,7 +644,9 @@ def create_dkkm_boxplots(dkkm_df: pd.DataFrame, model: str):
         for nf in num_factors_vals:
             data = dkkm_df[(dkkm_df['alpha'] == alpha) & (dkkm_df['num_factors'] == nf)]
             if len(data) > 0:
-                boxplot_data.append(data['sharpe'].values)
+                # Compute Sharpe per panel: mean(sharpe)
+                panel_sharpe = data.groupby('panel')['sharpe'].mean()
+                boxplot_data.append(panel_sharpe.values)
                 labels.append(f"$\\alpha$={alpha:.1e}\nn={nf}")
 
     # Check if all data groups have only 1 point
@@ -735,7 +739,9 @@ def create_ipca_boxplots(ipca_df: pd.DataFrame, model: str):
         for K in num_factors_vals:
             data = ipca_df[(ipca_df['alpha'] == alpha) & (ipca_df['num_factors'] == K)]
             if len(data) > 0:
-                boxplot_data.append(data['sharpe'].values)
+                # Compute Sharpe per panel: mean(sharpe)
+                panel_sharpe = data.groupby('panel')['sharpe'].mean()
+                boxplot_data.append(panel_sharpe.values)
                 labels.append(f"$\\alpha$={alpha:.1e}\nK={K}")
 
     # Check if all data groups have only 1 point
