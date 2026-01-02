@@ -5,7 +5,7 @@ Shared utilities for factor computation scripts (run_fama.py, run_dkkm.py, etc.)
 Modules:
     factor_utils: Shared utility functions for loading, preparing, and saving data
     factor_utils_numba: Numba-accelerated versions of factor_utils functions
-    ridge_utils: Ridge regression utilities (standard and randomized SVD)
+    ridge_utils: Ridge regression utilities using eigendecomposition with kernel trick
     dkkm_functions: DKKM (Random Fourier Features) factor computation
     dkkm_functions_numba: Numba-accelerated DKKM functions
     fama_functions: Fama-French and Fama-MacBeth factor computation

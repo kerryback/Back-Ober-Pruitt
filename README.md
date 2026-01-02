@@ -34,10 +34,12 @@ Rather than running `main.py`, the five steps can be executed individually:
 4.  `python run_dkkm {model_n} {k}` reads {model}_{n}_panel.pkl and {model}_{n}_moments.pkl and generates k DKKM factors.
 5. `python run_ipca {model_n} {k}` reads {model}_{n}_panel.pkl and {model}_{n}_moments.pkl and generates k IPCA factors.
 
+There are two additional scripts in the root folder that are not employed in the main workflow.  analysis.py produces figures and tables.  view_pickle.py is a small utility script to describe the contents of a pickle file.
+
 ## Implementation Details
 
 1. IPCA is implemented using pymanopt rather than sequential least squares.  There is no parallelization.  The solution for each group of 360 months is used to initialize pymanopt for the next group.
-2. Randomized SVD is used in ridge regression when the DKKM factors exceeds a threshold (controlled by config.py parameters)
+2. Ridge regression uses the kernel trick for computational efficiency when the number of factors exceeds the sample size (360 months).
 3. Some numba acceleration is used in `run_dkkm.py`
 4. `calculate_moments.py` processes months in chunks (controlled by config.py parameter) and writes each chunk to disk before proceeding to the next chunk. This is to conserve RAM.  Within each chunk, months are processed in parallel (controlled by n_jobs in config.py).  At the end of the script, the chunks are read and compiled into a single pickle file.  The intermediate pickle files are deleted.
 5.  If book value at $t-1$ is zero, then ROE and asset growth at $t$ are set to zero.  The number of firm/months with zero book value is computed for each panel and logged.  The default value of BURNIN was raised from 200 to 300 to reduce the frequency of zero book values.
@@ -83,8 +85,6 @@ IPCA_WARM_START = True              # Use previous solution as initial guess
 ALPHA_LST = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1]  # For BGN/KP14
 ALPHA_LST_GS = [0, 0.0000001, ..., 0.1, 1]          # For GS21
 IPCA_ALPHA_LST = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1]
-RIDGE_SVD_THRESHOLD = 1000  # Use randomized SVD when # factors > threshold
-RIDGE_SVD_RANK = 500  # Rank approximation for randomized SVD (uses this many singular values)
 ```
 
 ### Model Parameters

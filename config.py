@@ -58,10 +58,6 @@ ALPHA_LST_GS = [0, 0.0000001, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1]  #
 # Fama-MacBeth preprocessing
 STDZ_FM = False  # Standardize characteristics in Fama-MacBeth (False matches original)
 
-# Ridge regression optimization
-RIDGE_SVD_THRESHOLD = 1000  # Use randomized SVD when D > threshold
-RIDGE_SVD_RANK = 500  # Rank approximation for randomized SVD
-
 # =============================================================================
 # IPCA PARAMETERS
 # =============================================================================
@@ -246,8 +242,6 @@ def get_model_config(model_name):
         'alpha_lst_fama': ALPHA_LST_FAMA,
         'alpha_lst': MODEL_ALPHA_LST[model_name],
         'stdz_fm': STDZ_FM,
-        'ridge_svd_threshold': RIDGE_SVD_THRESHOLD,
-        'ridge_svd_rank': RIDGE_SVD_RANK,
         # IPCA parameters
         'ipca_k_values': IPCA_K_VALUES,
         'ipca_n_restarts': IPCA_N_RESTARTS,
